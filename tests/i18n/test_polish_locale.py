@@ -15,14 +15,11 @@ from deeptutor.services.config.settings_spec import _LANGUAGE_CHOICES
 from deeptutor.services.prompt.language import language_directive, language_label
 from deeptutor.services.settings.interface_settings import _normalize_language
 
-
 WEB = pathlib.Path(__file__).resolve().parents[2] / "web"
 
 
 def _catalog(locale: str) -> dict[str, str]:
-    return json.loads(
-        (WEB / f"locales/{locale}/app.json").read_text(encoding="utf-8")
-    )
+    return json.loads((WEB / f"locales/{locale}/app.json").read_text(encoding="utf-8"))
 
 
 @pytest.mark.parametrize(
