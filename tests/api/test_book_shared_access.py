@@ -58,18 +58,14 @@ def shared_env(tmp_path, monkeypatch):
     bob = save_user("bob", "hash", role="user")
     editor = save_user("editor", "hash", role="user")
     default_learner = save_user("default-learner", "hash", role="user", preset="learner")
-    books_without_acl = save_user(
-        "books-without-acl", "hash", role="user", preset="learner"
-    )
+    books_without_acl = save_user("books-without-acl", "hash", role="user", preset="learner")
     reader = save_user("reader", "hash", role="user", preset="learner")
     set_book_permission("alice", BookPermission(books=(("bk_shared", "read"),)))
     set_book_permission("bob", BookPermission(books=(("bk_shared", "read"),)))
     set_book_permission("editor", BookPermission(books=(("bk_shared", "edit"),)))
     set_book_permission("default-learner", BookPermission(create=False))
     set_book_permission("books-without-acl", BookPermission(create=False))
-    set_book_permission(
-        "reader", BookPermission(create=False, books=(("bk_shared", "read"),))
-    )
+    set_book_permission("reader", BookPermission(create=False, books=(("bk_shared", "read"),)))
     books_grant = deepcopy(learner_grant(reader["id"]))
     books_grant["learning_policy"]["allowed_surfaces"] = ["chat", "reading", "books"]
     save_grant(books_without_acl["id"], deepcopy(books_grant))
