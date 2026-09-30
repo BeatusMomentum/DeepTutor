@@ -24,6 +24,13 @@ CLOUD_CFG = MinerUConfig(mode="cloud", api_token="tok")
 _SLICING_MARKERS = ("auto-splitting", "parsing part", "merging part")
 
 
+@pytest.fixture(autouse=True)
+def isolated_checkpoints(tmp_path, monkeypatch):
+    from deeptutor.services.parsing.engines.mineru import checkpoints
+
+    monkeypatch.setattr(checkpoints, "checkpoint_root", lambda: tmp_path / "checkpoints")
+
+
 def _make_pdf(path: Path, pages: int) -> Path:
     writer = PdfWriter()
     for _ in range(pages):
@@ -250,3 +257,152 @@ def test_merged_artifacts_md_order_and_unique_images(
         "images/part01_b.jpg",
         "images/part02_a.jpg",
     ]
+
+
+def test_original_page_indices_include_nested_blocks(tmp_path, monkeypatch):
+    pdf = _make_pdf(tmp_path / "book.pdf", 5)
+    config = MinerUConfig(mode="cloud", api_token="tok", max_pages_per_part=2)
+    _install_fake_parse(
+        monkeypatch,
+        extras=lambda part: (
+            {"a.jpg": b"image"},
+            [
+                {
+                    "type": "image",
+                    "img_path": "images/a.jpg",
+                    "page_idx": 0,
+                    "children": [{"page_idx": 0, "text": "caption"}],
+                }
+            ],
+        ),
+    )
+    out = mineru_cloud.parse_cloud(pdf, tmp_path / "out", config)
+    rows = json.loads((out / "book_content_list.json").read_text())
+    assert [row["page_idx"] for row in rows] == [0, 2, 4]
+    assert [row["children"][0]["page_idx"] for row in rows] == [0, 2, 4]
+    assert all((out / row["img_path"]).is_file() for row in rows)
+
+
+@pytest.mark.parametrize("bad_index", [-1, 2, True, "0", None, 1.5])
+def test_invalid_page_index_does_not_create_ready_checkpoint(tmp_path, monkeypatch, bad_index):
+    from deeptutor.services.parsing.engines.mineru.config import MinerUError
+
+    pdf = _make_pdf(tmp_path / "bad.pdf", 3)
+    config = MinerUConfig(mode="cloud", api_token="tok", max_pages_per_part=2)
+    _install_fake_parse(monkeypatch, extras=lambda part: ({}, [{"page_idx": bad_index}]))
+    with pytest.raises(MinerUError, match="page_idx"):
+        mineru_cloud.parse_cloud(pdf, tmp_path / "out", config)
+    assert not list((tmp_path / "checkpoints").rglob("ready.json"))
+
+
+def test_retry_reuses_completed_slice_after_output_cleanup(tmp_path, monkeypatch):
+    import shutil
+
+    from deeptutor.services.parsing.engines.mineru.config import MinerUError
+
+    pdf = _make_pdf(tmp_path / "retry.pdf", 5)
+    config = MinerUConfig(mode="cloud", api_token="tok", max_pages_per_part=2)
+    calls = []
+    fail = True
+
+    def upload(client, part, config, key_pool, **kwargs):
+        calls.append(part.name)
+        if fail and part.name.endswith("02.pdf"):
+            raise MinerUError("synthetic transport interruption")
+        return _fake_archive_bytes(part.stem, "text", content_items=[{"page_idx": 0}])
+
+    monkeypatch.setattr(mineru_cloud, "_upload_and_fetch_archive", upload)
+    with pytest.raises(MinerUError, match="interruption"):
+        mineru_cloud.parse_cloud(pdf, tmp_path / "out", config)
+    shutil.rmtree(tmp_path / "out")  # ParseService removes failed work directories
+    fail = False
+    out = mineru_cloud.parse_cloud(pdf, tmp_path / "out", config)
+    assert calls == ["retry_part01.pdf", "retry_part02.pdf", "retry_part02.pdf", "retry_part03.pdf"]
+    assert [
+        row["page_idx"] for row in json.loads((out / "retry_content_list.json").read_text())
+    ] == [0, 2, 4]
+
+
+def test_corrupt_checkpoint_reparses_only_affected_slice(tmp_path, monkeypatch):
+    pdf = _make_pdf(tmp_path / "book.pdf", 3)
+    config = MinerUConfig(mode="cloud", api_token="tok", max_pages_per_part=2)
+    calls = _install_fake_parse(monkeypatch)
+    mineru_cloud.parse_cloud(pdf, tmp_path / "out", config)
+    archive = next((tmp_path / "checkpoints").glob("*/0-2/*.zip"))
+    archive.write_bytes(b"truncated")
+    calls.clear()
+    mineru_cloud.parse_cloud(pdf, tmp_path / "out", config)
+    assert [p.name for p in calls] == ["book_part01.pdf"]
+
+
+def test_checkpoint_identity_tracks_source_and_parser_but_not_credentials(tmp_path):
+    from dataclasses import replace
+
+    from deeptutor.services.parsing.engines.mineru.checkpoints import job_directory
+
+    pdf = _make_pdf(tmp_path / "book.pdf", 3)
+    config = MinerUConfig(mode="cloud", api_token="secret-one", max_pages_per_part=2)
+    key = job_directory(pdf, config)
+    assert job_directory(pdf, replace(config, api_token="secret-two")) == key
+    for change in [
+        dict(language="ch"),
+        dict(model_version="vlm"),
+        dict(is_ocr=True),
+        dict(enable_formula=False),
+        dict(enable_table=False),
+        dict(max_pages_per_part=1),
+        dict(api_base_url="https://example.test"),
+    ]:
+        assert job_directory(pdf, replace(config, **change)) != key
+    _make_pdf(pdf, 4)
+    assert job_directory(pdf, config) != key
+
+
+def test_slice_setting_persists_and_cloud_signature_changes(tmp_path):
+    from deeptutor.services.config.runtime_settings import RuntimeSettingsService
+    from deeptutor.services.parsing.engines.mineru.engine import MinerUParser
+
+    service = RuntimeSettingsService(tmp_path / "settings", process_env={})
+    service.save_mineru({"max_pages_per_part": 120})
+    assert service.load_mineru()["max_pages_per_part"] == 120
+    service.save_mineru({"max_pages_per_part": 500})
+    assert service.load_mineru()["max_pages_per_part"] == 200
+    parser = MinerUParser()
+    assert parser.signature(MinerUConfig(mode="cloud", max_pages_per_part=2)) != parser.signature(
+        MinerUConfig(mode="cloud", max_pages_per_part=3)
+    )
+    assert parser.signature(MinerUConfig(mode="local", max_pages_per_part=2)) == parser.signature(
+        MinerUConfig(mode="local", max_pages_per_part=3)
+    )
+
+
+def test_default_180_page_boundary_is_rebased(tmp_path, monkeypatch):
+    pdf = _make_pdf(tmp_path / "large.pdf", 181)
+    _install_fake_parse(monkeypatch, extras=lambda part: ({}, [{"page_idx": 0}]))
+    out = mineru_cloud.parse_cloud(pdf, tmp_path / "out", CLOUD_CFG)
+    rows = json.loads((out / "large_content_list.json").read_text())
+    assert [row["page_idx"] for row in rows] == [0, 180]
+
+
+def test_checkpoint_write_failure_does_not_fail_parse(tmp_path, monkeypatch):
+    from deeptutor.services.parsing.engines.mineru.checkpoints import SliceCheckpoint
+
+    def fail_save(self, archive):
+        raise OSError("synthetic read-only cache")
+
+    monkeypatch.setattr(SliceCheckpoint, "save", fail_save)
+    pdf = _make_pdf(tmp_path / "book.pdf", 3)
+    config = MinerUConfig(mode="cloud", api_token="tok", max_pages_per_part=2)
+    _install_fake_parse(monkeypatch)
+    out = mineru_cloud.parse_cloud(pdf, tmp_path / "out", config)
+    assert (out / "book.md").is_file()
+
+
+@pytest.mark.parametrize("pointer", ["{", "[]", '{"sha256":"../../escape"}'])
+def test_invalid_checkpoint_pointer_is_a_miss(tmp_path, pointer):
+    from deeptutor.services.parsing.engines.mineru.checkpoints import SliceCheckpoint
+
+    checkpoint = SliceCheckpoint(tmp_path, 0, 2)
+    checkpoint.directory.mkdir()
+    checkpoint.pointer.write_text(pointer)
+    assert checkpoint.load() is None
