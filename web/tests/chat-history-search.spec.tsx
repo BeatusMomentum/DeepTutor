@@ -1,6 +1,9 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import ChatHistorySection from "@/components/space/ChatHistorySection";
+import { searchAllSessions } from "@/lib/session-api";
+
+const searchMock = vi.mocked(searchAllSessions);
 
 const fixture = vi.hoisted(() => ({
   calls: [] as Array<{ query: string; signal?: AbortSignal }>,
@@ -127,4 +130,46 @@ it("searches the full account history, then restores the unfiltered index", asyn
   fireEvent.change(input, { target: { value: "" } });
   expect(screen.getByText("Recent chat")).toBeInTheDocument();
   expect(screen.queryByText("Older conversation")).toBeNull();
+});
+
+it("cancels a stale search when the query changes", async () => {
+  render(<ChatHistorySection />);
+
+  await act(async () => {
+    await Promise.resolve();
+  });
+
+  vi.useFakeTimers();
+  searchMock.mockImplementationOnce(
+    (query: string, signal?: AbortSignal) => {
+      fixture.calls.push({ query, signal });
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("Aborted", "AbortError")),
+          { once: true },
+        );
+      });
+    },
+  );
+
+  const input = screen.getByPlaceholderText("Search chat history...");
+  await act(async () => {
+    fireEvent.change(input, { target: { value: "Bay" } });
+  });
+  await act(async () => {
+    vi.advanceTimersByTime(300);
+  });
+
+  await act(async () => {
+    fireEvent.change(input, { target: { value: "Bayes" } });
+  });
+  await act(async () => {
+    vi.advanceTimersByTime(300);
+  });
+
+  expect(fixture.calls.map((call) => call.query)).toEqual(["Bay", "Bayes"]);
+  expect(fixture.calls[0].signal?.aborted).toBe(true);
+  expect(fixture.calls[1].signal?.aborted).toBe(false);
+  expect(screen.getByText("Older conversation")).toBeInTheDocument();
 });
