@@ -5715,5 +5715,6 @@
   "Review move": "Vérifier le déplacement",
   "{{count}} files · {{bytes}} bytes": "{{count}} fichiers · {{bytes}} octets",
   "Assignments updated: {{names}}": "Attributions mises à jour : {{names}}",
-  "Could not search chat history. Try again.": "Impossible de rechercher dans l’historique des conversations. Réessayez."
+  "Could not search chat history. Try again.": "Impossible de rechercher dans l’historique des conversations. Réessayez.",
+  "Quiz stars: {{count}}": "Étoiles du quiz : {{count}}"
 }
