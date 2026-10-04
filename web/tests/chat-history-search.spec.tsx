@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import ChatHistorySection from "@/components/space/ChatHistorySection";
-import { searchAllSessions } from "@/lib/session-api";
+import { searchAllSessions, updateSessionOrganization } from "@/lib/session-api";
 
 const searchMock = vi.mocked(searchAllSessions);
 
@@ -40,7 +40,9 @@ vi.mock("@/components/space/SpaceSectionHeader", () => ({
   default: ({ title }: { title: string }) => <h1>{title}</h1>,
 }));
 vi.mock("@/components/space/ArchivedConversations", () => ({
-  default: () => null,
+  default: ({ onRestore }: { onRestore: (id: string) => void }) => (
+    <button onClick={() => onRestore("older")}>Unarchive</button>
+  ),
 }));
 vi.mock("@/components/courses/OrganizedSessionList", () => ({
   default: ({
@@ -65,7 +67,7 @@ vi.mock("@/components/courses/OrganizedSessionList", () => ({
   ),
 }));
 vi.mock("@/lib/session-api", () => ({
-  sessionWorkspaceId: () => "",
+  sessionWorkspaceId: (session?: { content_workspace_id?: string }) => session?.content_workspace_id ?? "",
   listAllSessions: vi.fn(async () => [
     {
       id: "recent",
@@ -105,6 +107,7 @@ vi.mock("@/lib/session-api", () => ({
 afterEach(() => {
   vi.useRealTimers();
   fixture.calls.length = 0;
+  vi.clearAllMocks();
 });
 
 it("searches the full account history, then restores the unfiltered index", async () => {
@@ -172,4 +175,36 @@ it("cancels a stale search when the query changes", async () => {
   expect(fixture.calls[0].signal?.aborted).toBe(true);
   expect(fixture.calls[1].signal?.aborted).toBe(false);
   expect(screen.getByText("Older conversation")).toBeInTheDocument();
+});
+
+it("reports a failed transcript search and retries the same query", async () => {
+  render(<ChatHistorySection />);
+  await act(async () => { await Promise.resolve(); });
+  vi.useFakeTimers();
+  searchMock.mockRejectedValueOnce(new Error("Network unavailable"));
+  fireEvent.change(screen.getByPlaceholderText("Search chat history..."), { target: { value: "Bayes" } });
+  await act(async () => { vi.advanceTimersByTime(300); });
+  expect(screen.getByRole("alert")).toHaveTextContent("Could not search chat history. Try again.");
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  await act(async () => { vi.advanceTimersByTime(300); });
+  expect(searchMock).toHaveBeenLastCalledWith("Bayes", expect.any(AbortSignal), { allWorkspaces: true });
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByText("Older conversation")).toBeInTheDocument();
+});
+
+it("restores an archived search match in its own workspace", async () => {
+  render(<ChatHistorySection />);
+  await act(async () => { await Promise.resolve(); });
+  vi.useFakeTimers();
+  searchMock.mockResolvedValueOnce([{
+    id: "older", session_id: "older", title: "Archived chat", created_at: 1, updated_at: 2,
+    message_count: 4, last_message: "", content_workspace_id: "other-workspace",
+    preferences: { archived: true }, match_excerpt: "Bayes", match_role: "user",
+    match_message_id: 7, match_created_at: 1,
+  }]);
+  fireEvent.change(screen.getByLabelText("Filter by archive status"), { target: { value: "archived" } });
+  fireEvent.change(screen.getByPlaceholderText("Search chat history..."), { target: { value: "Bayes" } });
+  await act(async () => { vi.advanceTimersByTime(300); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Unarchive" })); });
+  expect(updateSessionOrganization).toHaveBeenCalledWith("older", { archived: false }, "other-workspace");
 });

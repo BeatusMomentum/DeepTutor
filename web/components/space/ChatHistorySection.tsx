@@ -71,6 +71,7 @@ export default function ChatHistorySection({
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SessionSearchResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [searchVersion, setSearchVersion] = useState(0);
   const searchGenerationRef = useRef(0);
   const [courseFilter] = useState("all");
@@ -116,6 +117,7 @@ export default function ChatHistorySection({
   useEffect(() => {
     const generation = ++searchGenerationRef.current;
     const term = query.trim();
+    setSearchError(false);
     if (!term) {
       setSearchResults([]);
       setSearchLoading(false);
@@ -137,6 +139,7 @@ export default function ChatHistorySection({
             return;
           if (generation !== searchGenerationRef.current) return;
           setSearchResults([]);
+          setSearchError(true);
         })
         .finally(() => {
           if (generation === searchGenerationRef.current)
@@ -236,7 +239,13 @@ export default function ChatHistorySection({
     async (sessionId: string) => {
       setRestoringId(sessionId);
       try {
-        await updateSessionOrganization(sessionId, { archived: false });
+        await updateSessionOrganization(
+          sessionId,
+          { archived: false },
+          sessionWorkspaceId(
+            filteredSessions.find((item) => item.session_id === sessionId),
+          ),
+        );
         // Restoring cascades to the tutor threads under the conversation, so
         // the server's own list is what says which rows are left.
         await reload(true, true);
@@ -245,7 +254,7 @@ export default function ChatHistorySection({
         setRestoringId(null);
       }
     },
-    [reload],
+    [filteredSessions, reload],
   );
 
   const handleOrganize = useCallback(
@@ -355,6 +364,18 @@ export default function ChatHistorySection({
                   className="h-8 animate-pulse rounded bg-[var(--muted)]/45"
                 />
               ))}
+            </div>
+          ) : searchError ? (
+            <div role="alert" className="flex items-center justify-between gap-3 px-2 py-4 text-[12.5px] text-[var(--muted-foreground)]">
+              <p>{t("Could not search chat history. Try again.")}</p>
+              <button
+                type="button"
+                onClick={() => setSearchVersion((version) => version + 1)}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--muted)]"
+              >
+                <RefreshCw size={13} strokeWidth={1.8} />
+                {t("Retry")}
+              </button>
             </div>
           ) : archiveFilter === "archived" ? (
             <ArchivedConversations
