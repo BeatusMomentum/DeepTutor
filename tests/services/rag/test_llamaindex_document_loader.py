@@ -13,8 +13,21 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 import threading
+from types import SimpleNamespace
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def isolated_caption_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provider stubs must not read or write a persistent workspace cache."""
+    from deeptutor.services.llm import image_caption_cache
+
+    monkeypatch.setattr(
+        image_caption_cache,
+        "get_path_service",
+        lambda: SimpleNamespace(get_parse_cache_root=lambda: tmp_path / "parse_cache"),
+    )
 
 
 def _install_stub_parse_service(monkeypatch, results: dict[str, "object"]) -> None:
