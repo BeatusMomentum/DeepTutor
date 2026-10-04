@@ -15,8 +15,11 @@ text embedding model can retrieve it by its caption and context. When `rag`
 retrieves that record in the chat loop, a vision capable answer model receives
 the verified image pixels in its next request. A text only model receives the
 caption and context with an explicit warning that it has not seen the pixels.
-At most 64 images per document are retained, each image is limited to 5 MiB,
-and at most two retrieved images are sent in one model continuation.
+All supported extracted images are retained, each image is limited to 5 MiB,
+and at most two retrieved images are sent in one model continuation. The
+document retention count is independent of this model request budget. A visual
+manifest larger than 16 MiB fails publication explicitly rather than silently
+retaining only an initial subset of the document.
 
 Current extraction coverage depends on the selected parser. MinerU can emit
 structured PDF figures. PyMuPDF4LLM can emit PDF and EPUB images when image
