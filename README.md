@@ -570,6 +570,8 @@ and their subdomains; `blocked_domains` always takes precedence.
 
 Project-root `.env` is **not** read as an application config file. For a minimal model setup, save a Base URL and API key in **Settings → Providers**, then add and select an LLM in **Language models**. Add an embedding profile only if you plan to use Knowledge Base / RAG features.
 
+For API Route, select **API Route** in **Settings → Providers** and enter an API Route key. The preset uses `https://global.api-route.com/v1`; then add a model using its API Route model ID in **Language models**. See the [API Route quickstart](https://www.api-route.com/docs/quickstart) for key and model setup.
+
 LLM and task-model profiles expose an **API format** setting when their provider
 supports a choice. Keep `Auto` for normal routing and fallback, or choose
 `OpenAI Chat Completions`, `OpenAI Responses`, or `Anthropic Messages`; forced
@@ -801,6 +803,12 @@ The built-in LightRAG engine is installed with `pip install 'deeptutor[rag-light
 
 Native LightRAG queries and incremental indexing require the embedding configuration recorded by the published index, including the model, dimension, and endpoint identity. If it changes, restore the original configuration or rebuild with the current embedding; indexes without a recorded embedding identity require a rebuild. The knowledge-base detail and index-version views show recovery guidance, while files remain available for viewing and download.
 
+**Scoring a knowledge base.** With several engines available, "which one retrieves best here?" is an empirical question — so `deeptutor kb eval` answers it. Write a QA set (one JSON object per line: a `query` plus the `gold` passages an ideal retrieval should return), then score the KB with `deeptutor kb eval <name> --dataset qa.jsonl --top-k 5 [--mode hybrid] [--save baseline.json]`. Each case is retrieved through the same path a chat turn uses, its ranked citations are matched against the gold passages using exact text or lexical overlap (thresholds are tunable with `--min-ratio`; semantic equivalence is not assessed), and the run reports **Recall@k / Precision@k / nDCG@k / MRR / MAP / Hit@k**. Metrics are pure functions over the ranking, so no model judges the output: scores are reproducible and diffable, and a saved baseline turns the set into a regression gate for an embedding switch, a reranker change, or a chunk-size experiment. Cases whose search failed (a missing index, bad credentials) carry no score and are reported separately rather than dragging the means down. PageIndex uses reasoning as retrieval and returns no ranked chunks, so it is excluded.
+
+```jsonl
+{"query": "Why do transformers scale attention?", "gold": ["Scaling keeps the dot products from growing with the dimension."]}
+```
+
 </details>
 
 <details>
@@ -847,6 +855,9 @@ The Memory Graph shows the whole pyramid — L3 synthesis at the centre, L2 in t
 Settings is the operational control plane, opening on **General** for interface and model output language. Its searchable navigator links to independent pages: **Personal** covers Workspaces, Data migration, Appearance, and Usage statistics; **Learning & conversation** covers starting points, attachments, Video Learning, learner and guardian controls, Learning progress, and Memory; **Models & services** covers Providers, Language models, Task models, Embedding, Search, Voice, and Multimodal generation; **Features & integrations** covers tools, capability parameters, Partners & agents, and Knowledge & documents. **System** holds Network, Runtime status, and About; **Archived chats** lets you search, restore, or permanently delete archived conversations. Runtime status contains backend health, resident memory, and the **Readiness** matrix grading capability blockers, warnings, and suggestions. Workspaces keeps topic files and learning state separate, with verified migration and export under Data migration. A **provider** holds a vendor's address and credential for reuse by its service models; the model pages choose saved providers and configure model names and capabilities. **Task models** pin a small, fast model for background work — naming conversations and writing starting points — and resolve to the active default when empty. Voice groups speech synthesis and transcription; Multimodal generation groups image and video models. Partners & agents configures local harnesses and a remote Hermes gateway.
 
 **Xiaomi MiMo speech.** Add a Xiaomi MiMo provider with `https://api.xiaomimimo.com/v1` and its API key, then add `mimo-v2.5-tts` under Settings → Voice. Choose a preset such as `mimo_default`, `冰糖`, or `苏打`, use `wav` or `pcm16` output, and audition it before applying. Voice instructions control style and speaking speed. This adapter supports preset speech only; voice design and voice cloning require separate models and are not supported. If an older MiMo speech model was configured through the generic OpenAI-compatible adapter, recreate its speech entry using the Xiaomi MiMo provider so it uses the chat-completions protocol. See the [official MiMo speech guide](https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5).
+
+**MiniMax speech** — in Settings → Voice, choose MiniMax for text-to-speech and select `speech-2.8-hd`. Configure a MiniMax API key and a system or custom voice ID; the default voice is `English_expressive_narrator`. The API base defaults to `https://api.minimax.io/v1`; for the China region use `https://api.minimaxi.com/v1`. Read-aloud and voice previews use the native speech endpoint, with MP3, WAV, FLAC or PCM output, sample rate, speed and language controls. See the [MiniMax speech API](https://platform.minimax.io/docs/api-reference/speech-t2a-http) for voice IDs and account availability.
+
 
 **Video Learning** under Settings → Learning & conversation defaults to the official privacy-enhanced YouTube IFrame Player. To keep playback local, set the administrator-managed Invidious API origin (for example `http://127.0.0.1:3000`), test it, select Invidious, and save. New or reopened videos pick up the provider immediately with the same material ID and progress. Invidious media is streamed through DeepTutor's byte-range proxy; upstream URLs are neither exposed to the browser nor stored on disk. If the instance fails, DeepTutor stays offline from YouTube until the learner explicitly chooses the native YouTube fallback. Public-caption tutoring is optional: install `.[video-learning]`; playback continues without it, while transcript-based **Explain here** is disabled with a reason.
 
@@ -964,7 +975,7 @@ The repo ships a root [`SKILL.md`](SKILL.md) — a ~200-line handover doc that t
 | `deeptutor run <capability> <message>` | Run a single capability turn (`chat`, `ask_questions`, `deep_solve`, `deep_question`, `deep_research`, `visualize`, `math_animator`, `mastery_path`, `immersive_reading`, `course_study`, `immersive_watching`, `audio_overview`); add `--format json` for NDJSON output |
 | `deeptutor chat` | Interactive REPL with capability, tool, KB, notebook, and history controls |
 | `deeptutor partner list/create/start/stop` | Manage IM-connected partners |
-| `deeptutor kb list/info/create/connect-kiwix/add/search/set-default/delete/list-sources/sync` | Manage knowledge bases and synchronize registered GitHub/web sources (with source add/remove commands) |
+| `deeptutor kb list/info/create/connect-kiwix/add/search/eval/set-default/delete/list-sources/sync` | Manage knowledge bases, connect Kiwix archives, score retrieval quality against a QA set, and synchronize registered GitHub/web sources (with source add/remove commands) |
 | `deeptutor skill search/install/list/remove/login/logout/publish/update` | Manage skills, install from hubs, and publish your own (`eduhub:<slug>` by default, see Ecosystem) |
 | `deeptutor memory show/clear` | Inspect L2/L3 memory docs or clear L1/all memory |
 | `deeptutor session list/show/open/rename/delete` | Manage shared sessions |

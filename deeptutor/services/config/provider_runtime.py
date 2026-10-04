@@ -326,6 +326,13 @@ TTS_PROVIDERS: dict[str, VoiceProviderSpec] = {
         default_model="mimo-v2.5-tts",
         default_voice="mimo_default",
     ),
+    "minimax": VoiceProviderSpec(
+        label="MiniMax",
+        default_api_base="https://api.minimax.io/v1",
+        adapter="minimax",
+        default_model="speech-2.8-hd",
+        default_voice="English_expressive_narrator",
+    ),
     "volcengine_speech": VoiceProviderSpec(
         label="Volcengine Speech (Doubao)",
         default_api_base="https://openspeech.bytedance.com/api/v3",
