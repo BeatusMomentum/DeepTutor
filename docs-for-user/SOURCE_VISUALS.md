@@ -56,3 +56,33 @@ Rotated, cropped, annotated, vector-bearing, or non-default UserUnit pages are
 left unchanged. Local MinerU, custom cloud endpoints, normal PDFs, and non-PDF
 inputs keep their existing behavior. Temporary copies are removed after success
 or failure, and upload is refused if compressed image streams change.
+
+## Optional image-description batches
+
+The existing LlamaIndex image-description pass can send multiple images per
+vision request. Set `image_description_batch_size` through
+`PUT /api/knowledge-bases/rag-pipelines/llamaindex/config`, for example:
+
+```json
+{"image_description_batch_size": 4}
+```
+
+The default is `1`, preserving individual requests; accepted values are clamped
+to 1–8. Concurrency limits count batches when enabled, and the existing timeout
+covers the whole batch including any split attempts. Returned captions are
+matched by explicit IDs, never by response order. Malformed JSON/ID maps and
+explicit context overflow split into smaller groups, eventually using the
+existing single-image prompt. A group of N images makes at most 2N−1 completion
+calls, with provider retries disabled for this mode. Authentication and rate
+limits stop queued groups in the job; other API/transport errors do not split.
+
+This only affects subsequently processed images in the existing LlamaIndex
+description pass. It does not enable descriptions for structured source visuals
+or alter reading-material captions. Batches use a different structured prompt
+and cache complete, successful groups separately from independent single-image
+captions. The digest includes ordered image contents and metadata, prompts,
+model identity, and retry policy. Failed, incomplete, or canceled groups are
+not cached; successful split groups can be reused. Setting the size
+back to `1` restores the normal single-image path. The model must support
+multiple image blocks; unsupported API responses are reported without a burst
+of fallback requests.

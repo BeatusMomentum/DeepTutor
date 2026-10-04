@@ -10,6 +10,7 @@ from typing import Any, Callable
 from deeptutor.services.file_io import atomic_write_json as _atomic_write_json
 from deeptutor.services.path_service import get_path_service
 
+from .image_description import normalize_image_description_model
 from .origins import normalize_origins
 
 DEFAULT_SYSTEM_SETTINGS: dict[str, Any] = {
@@ -248,6 +249,7 @@ DEFAULT_DOCUMENT_PARSING_SETTINGS: dict[str, Any] = {
     # Caption embedded figures with a vision model at ingest, so a text-only
     # model reading the material can still describe its images.
     "image_caption": False,
+    "image_description_model": None,
     "engines": {
         DOCUMENT_PARSING_ENGINE_TEXT_ONLY: _DEFAULT_TEXT_ONLY_ENGINE,
         DOCUMENT_PARSING_ENGINE_MINERU: _DEFAULT_MINERU_ENGINE,
@@ -330,6 +332,7 @@ DEFAULT_LLAMAINDEX_SETTINGS: dict[str, Any] = {
     "chunk_size": 512,
     "chunk_overlap": 50,
     "image_description_concurrency": 4,
+    "image_description_batch_size": 1,
     "image_description_timeout_seconds": 60,
 }
 
@@ -1012,6 +1015,9 @@ class RuntimeSettingsService:
             "image_description_concurrency": _coerce_clamped_int(
                 settings.get("image_description_concurrency"), 4, 1, 16
             ),
+            "image_description_batch_size": _coerce_clamped_int(
+                settings.get("image_description_batch_size"), 1, 1, 8
+            ),
             "image_description_timeout_seconds": _coerce_clamped_int(
                 settings.get("image_description_timeout_seconds"), 60, 5, 600
             ),
@@ -1128,6 +1134,9 @@ class RuntimeSettingsService:
             "version": 2,
             "engine": engine,
             "image_caption": _coerce_bool(settings.get("image_caption"), False),
+            "image_description_model": normalize_image_description_model(
+                settings.get("image_description_model")
+            ),
             "engines": engines_out,
         }
 
