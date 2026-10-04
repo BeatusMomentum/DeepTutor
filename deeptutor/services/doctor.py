@@ -337,7 +337,7 @@ def _redact_error(exc: Exception, config: Any) -> str:
 
 async def _probe_provider(config: Any) -> None:
     from deeptutor.services.config.loader import get_agent_params
-    from deeptutor.services.llm import complete
+    from deeptutor.services.llm.factory import complete_with_config
 
     # Share the Settings probe's configurable budget. A 64-token cap can be
     # exhausted by hidden reasoning before a healthy model emits even "OK".
@@ -351,17 +351,11 @@ async def _probe_provider(config: Any) -> None:
     except (TypeError, ValueError):
         max_tokens = 4096
 
-    response = await complete(
-        model=str(config.model),
+    response = await complete_with_config(
+        config,
         prompt="Reply with OK.",
         system_prompt="Reply with only OK.",
-        binding=str(config.binding),
-        api_key=str(config.api_key or ""),
-        base_url=str(config.effective_url or config.base_url or ""),
-        api_version=config.api_version,
         temperature=0,
-        extra_headers=config.extra_headers,
-        reasoning_effort=config.reasoning_effort,
         max_retries=0,
         allow_image_fallback=False,
         max_tokens=max_tokens,
