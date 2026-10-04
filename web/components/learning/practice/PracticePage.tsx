@@ -137,7 +137,7 @@ function ScopedPracticePage({ mode, initialImport }: { mode: "practice" | "libra
     >
       {!libraryOnly && <div className="mb-4 flex items-center gap-3 text-xs"><a href="/learning/practice" className="underline">{t("All workspaces")}</a><WorkspaceLabel row={{ content_workspace_id: activeWorkspaceId() }} /></div>}
       {session ? (
-        <PracticeSession ids={session} onClose={closeSession} />
+        <PracticeSession ids={session} onClose={closeSession} backLabel={libraryOnly ? t("Back to library") : undefined} />
       ) : (
         <>
           {notice && (
