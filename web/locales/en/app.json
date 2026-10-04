@@ -5294,5 +5294,9 @@
   "Mark was not deleted.": "Mark was not deleted.",
   "Mark was not updated.": "Mark was not updated.",
   "Draft note or reason...": "Draft note or reason...",
-  "Save mark": "Save mark"
+  "Save mark": "Save mark",
+  "Image description model": "Image description model",
+  "Use main LLM (fallback)": "Use main LLM (fallback)",
+  "Failed to load image description models.": "Failed to load image description models.",
+  "Select a vision model for image descriptions in documents.": "Select a vision model for image descriptions in documents."
 }
