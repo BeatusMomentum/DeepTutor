@@ -186,3 +186,24 @@ def test_eval_rejects_an_impossible_match_ratio(eval_env: SimpleNamespace) -> No
 
     assert result.exit_code == 1
     assert "min_ratio must be in (0, 1]" in result.output
+
+
+def test_eval_json_with_save_keeps_stdout_machine_readable(eval_env, tmp_path):
+    target = tmp_path / "saved.json"
+    result = runner.invoke(
+        app,
+        [
+            "kb",
+            "eval",
+            "kb1",
+            "--dataset",
+            str(eval_env.set_path),
+            "--format",
+            "json",
+            "--save",
+            str(target),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout) == json.loads(target.read_text())
+    assert "Report written to" in result.stderr

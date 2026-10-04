@@ -113,9 +113,9 @@ def _save_eval_report(save: str, payload: str) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(payload, encoding="utf-8")
     except OSError as exc:
-        console.print(f"[red]Could not write report: {exc}[/]")
+        typer.echo(f"Could not write report: {exc}", err=True)
         raise typer.Exit(code=1) from exc
-    console.print(f"[green]Report written to {target}[/]")
+    typer.echo(f"Report written to {target}", err=True)
 
 
 def _render_eval_report(report: EvalReport, name: str, provider: str) -> None:

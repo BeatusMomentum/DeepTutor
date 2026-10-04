@@ -112,12 +112,18 @@ def ndcg_at_k(hits: Hits, gold_count: int, k: int) -> float:
 
     The ideal ranking holds the case's gold passages (capped at ``k``) ahead of
     everything else, so a case whose gold is all retrieved but buried below
-    irrelevant chunks scores below 1.
+    irrelevant chunks scores below 1. Each rank contributes at most one gain,
+    and only when it introduces a gold passage not covered by an earlier rank.
+    Repeating the same passage cannot substitute for missing gold passages.
     """
     cutoff = _require_k(k)
     if gold_count <= 0:
         return 0.0
-    gains = [1.0 if matched else 0.0 for matched in hits[:cutoff]]
+    seen: set[int] = set()
+    gains: list[float] = []
+    for matched in hits[:cutoff]:
+        gains.append(1.0 if set(matched) - seen else 0.0)
+        seen.update(matched)
     ideal_dcg = _dcg([1.0] * min(gold_count, cutoff))
     if ideal_dcg == 0:
         return 0.0

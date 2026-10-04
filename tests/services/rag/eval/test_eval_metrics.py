@@ -153,3 +153,22 @@ def test_aggregate_of_nothing_is_zeroed_not_an_error() -> None:
     assert summary["queries"] == 0
     assert summary["recall@5"] == 0.0
     assert summary["ndcg@5"] == 0.0
+
+
+@pytest.mark.parametrize("count", [2, 3, 8])
+def test_duplicate_gold_cannot_replace_missing_passages(count):
+    duplicated = evaluate_hits("duplicate", [{0}] * count, 2, count)
+    single = evaluate_hits("single", [{0}], 2, count)
+    assert duplicated.recall == 0.5
+    assert duplicated.ndcg == pytest.approx(single.ndcg)
+    assert duplicated.ndcg == pytest.approx(0.6131, abs=1e-4)
+    assert evaluate_hits("complete", [{0}, {1}], 2, count).ndcg == 1.0
+
+
+def test_only_new_gold_adds_binary_gain_at_each_rank():
+    import math
+
+    assert ndcg_at_k([{0}, {0}, {0, 1}], 2, 3) == pytest.approx(
+        (1 + 1 / math.log2(4)) / (1 + 1 / math.log2(3))
+    )
+    assert ndcg_at_k([{0, 1}], 2, 2) == pytest.approx(1 / (1 + 1 / math.log2(3)))
