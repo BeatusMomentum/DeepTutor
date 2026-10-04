@@ -4279,6 +4279,7 @@
   "Schedule": "Planification",
   "Next run": "Prochaine exécution",
   "Automatic sync": "Synchronisation automatique",
+  "Bilingual pairs": "Paires bilingues",
   "Interval hours": "Intervalle (heures)",
   "Cancel sync": "Annuler la synchronisation",
   "Retry sync": "Réessayer la synchronisation",
@@ -5713,5 +5714,6 @@
   "Move this knowledge base with its documents, settings, and indexes. Existing workspace assignments are updated.": "Déplacer cette base avec ses documents, paramètres et index. Les attributions existantes seront mises à jour.",
   "Review move": "Vérifier le déplacement",
   "{{count}} files · {{bytes}} bytes": "{{count}} fichiers · {{bytes}} octets",
-  "Assignments updated: {{names}}": "Attributions mises à jour : {{names}}"
+  "Assignments updated: {{names}}": "Attributions mises à jour : {{names}}",
+  "Could not search chat history. Try again.": "Impossible de rechercher dans l’historique des conversations. Réessayez."
 }

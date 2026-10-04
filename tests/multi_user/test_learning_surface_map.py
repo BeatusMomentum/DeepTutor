@@ -28,6 +28,11 @@ from deeptutor.api.routers.auth import _learning_surface_for_path
         ("/api/courses", "GET", "reading"),
         ("/api/dashboard/learning-library/materials", "GET", "reading"),
         ("/api/dashboard/learning-library/reading", "GET", "reading"),
+        ("/api/books", "GET", "books"),
+        ("/api/books/bk_123", "GET", "books"),
+        ("/api/books/quiz-attempt", "POST", "books"),
+        ("/api/dashboard/learning-library/books", "GET", "books"),
+        ("/api/books-private", "GET", ""),
         ("/api/chat/sessions", "GET", "chat"),
         ("/api/question/generate", "POST", "chat"),
         ("/api/sessions/abc", "GET", "chat"),
@@ -63,6 +68,7 @@ def test_learning_surface_map(path: str, method: str, expected: str) -> None:
     ("path", "route_path", "expected"),
     [
         ("/api/knowledge-bases", "/api/knowledge-bases", "reading"),
+        ("/api/knowledge-bases/list", "/api/knowledge-bases/list", "reading"),
         ("/api/knowledge-bases/kb1", "/api/knowledge-bases/{kb_name}", "reading"),
         ("/api/knowledge-bases/kb1/files", "/api/knowledge-bases/{kb_name}/files", "reading"),
         (
@@ -463,3 +469,43 @@ def test_set_preset_checks_expected_user_id(mu_isolated_root, seed_user) -> None
     assert set_preset("student-standard", "learner", expected_user_id="different") is False
     _username, unchanged = get_user_by_id(record["id"])
     assert unchanged["preset"] == "standard"
+
+
+@pytest.mark.parametrize("surfaces, expected", [(["reading"], 200), (["chat"], 403)])
+def test_learner_proxy_list_obeys_reading_policy_over_http(
+    monkeypatch, mu_isolated_root, surfaces, expected
+) -> None:
+    from deeptutor.api.routers import auth, knowledge
+    from deeptutor.multi_user import learning_access
+    from deeptutor.multi_user.identity import save_user
+    from deeptutor.services.auth import TokenPayload, hash_password
+
+    save_user("admin", hash_password("admin-password"), role="admin")
+    learner = save_user("student", hash_password("student-password"), preset="learner")
+    token = TokenPayload(username="student", role="user", user_id=learner["id"])
+    monkeypatch.setattr(auth, "AUTH_ENABLED", True)
+    monkeypatch.setattr(auth, "decode_token", lambda _token: token)
+    monkeypatch.setattr(
+        learning_access,
+        "learning_policy_for_user",
+        lambda _user_id, **_kwargs: {"allowed_surfaces": surfaces},
+    )
+    calls = []
+
+    async def collection():
+        calls.append(True)
+        return []
+
+    monkeypatch.setattr(knowledge, "list_knowledge_bases", collection)
+    app = FastAPI()
+    app.include_router(
+        knowledge.router, prefix="/api", dependencies=[Depends(auth.require_learning_surface)]
+    )
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer student-token"}
+    response = client.get("/api/knowledge-bases/list", headers=headers)
+    assert response.status_code == expected
+    assert calls == ([True] if expected == 200 else [])
+    if expected == 200:
+        assert response.json() == []
+    assert client.get("/api/knowledge-bases/health", headers=headers).status_code == 403

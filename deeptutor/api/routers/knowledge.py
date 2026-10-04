@@ -2939,6 +2939,21 @@ async def list_knowledge_bases():
         raise HTTPException(status_code=500, detail=f"Failed to list knowledge bases: {e!s}")
 
 
+@router.get(
+    "/knowledge-bases/list",
+    response_model=list[KnowledgeBaseInfo],
+    include_in_schema=False,
+)
+async def list_knowledge_bases_proxy_alias():
+    """Proxy-safe alias for the KB list.
+
+    The collection URL is reserved by the frontend's streaming multipart
+    create route, which bypasses Next's request-buffering proxy. Browser list
+    requests use this path so GET traffic can use the normal backend rewrite.
+    """
+    return await list_knowledge_bases()
+
+
 @router.get("/knowledge-bases/{kb_name}")
 async def get_knowledge_base_details(kb_name: str):
     """Get detailed info for a specific KB."""
@@ -4682,6 +4697,18 @@ class AddWebSourceRequest(BaseModel):
     max_pages: int = Field(default=200, ge=1, le=200)
 
 
+class BilingualPairingInfo(BaseModel):
+    pairing_id: str
+    source_url: str
+    target_url: str
+    source_file: str = ""
+    target_file: str = ""
+    source_lang: str = ""
+    target_lang: str = ""
+    pairing_method: str = "hreflang"
+    updated_at: int = 0
+
+
 class WebSourceInfo(BaseModel):
     id: str
     url: str
@@ -4696,6 +4723,7 @@ class WebSourceInfo(BaseModel):
     last_sync_error: str | None = None
     added_at: str = ""
     navigation: dict | None = None
+    bilingual_pairings: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class WebSourceScheduleUpdate(BaseModel):
@@ -4834,6 +4862,33 @@ async def get_web_source_sync_jobs(kb_name: str):
         scheduler = get_web_source_sync_scheduler()
         jobs = scheduler.repo.list_jobs(get_current_user().id, resolved_name)
         return [WebSourceSyncJobInfo(**job.public_dict()) for job in jobs]
+
+
+@router.get(
+    "/knowledge-bases/{kb_name}/web-source/{source_id}/pairings",
+    response_model=list[BilingualPairingInfo],
+)
+async def get_web_source_pairings(kb_name: str, source_id: str):
+    with _knowledge_source_errors(kb_name):
+        manager, resolved_name, _ = _writable_kb(kb_name)
+        source = next(
+            (
+                item
+                for item in manager.get_web_sources(resolved_name)
+                if item.get("id") == source_id
+            ),
+            None,
+        )
+        if source is None:
+            raise HTTPException(status_code=404, detail=f"Source '{source_id}' not found")
+        scheduler = get_web_source_sync_scheduler()
+        repo_pairings = scheduler.repo.list_pairings(
+            get_current_user().id, resolved_name, source_id
+        )
+        if repo_pairings:
+            return [BilingualPairingInfo(**p.public_dict()) for p in repo_pairings]
+        meta_pairings = source.get("bilingual_pairings") or []
+        return [BilingualPairingInfo(**p) for p in meta_pairings]
 
 
 @router.put(
