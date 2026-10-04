@@ -101,21 +101,37 @@ function downstreamDepth<T extends BranchMessage>(
   if (cached !== undefined) return cached
   if (activeParents.has(parentKey)) return 0
 
+  // A long transcript must not consume the JavaScript call stack. Compute
+  // depths in postorder while retaining the same cycle guard and memoization.
+  const frame = (key: string) => ({ key, children: childrenByParent.get(key) ?? [], index: 0, depth: 0 })
+  const stack = [frame(parentKey)]
   activeParents.add(parentKey)
-  let depth = 0
-  for (const child of childrenByParent.get(parentKey) ?? []) {
-    if (child.id === undefined) {
-      depth = Math.max(depth, 1)
+  while (stack.length) {
+    const current = stack[stack.length - 1]
+    const child = current.children[current.index++]
+    if (!child) {
+      stack.pop()
+      activeParents.delete(current.key)
+      depthByParent.set(current.key, current.depth)
+      if (!stack.length) return current.depth
+      const parent = stack[stack.length - 1]
+      parent.depth = Math.max(parent.depth, 1 + current.depth)
       continue
     }
-    depth = Math.max(
-      depth,
-      1 + downstreamDepth(String(child.id), childrenByParent, depthByParent, activeParents)
-    )
+    if (child.id === undefined) {
+      current.depth = Math.max(current.depth, 1)
+      continue
+    }
+    const key = String(child.id)
+    const depth = depthByParent.get(key)
+    if (depth !== undefined || activeParents.has(key)) {
+      current.depth = Math.max(current.depth, 1 + (depth ?? 0))
+    } else {
+      activeParents.add(key)
+      stack.push(frame(key))
+    }
   }
-  activeParents.delete(parentKey)
-  depthByParent.set(parentKey, depth)
-  return depth
+  return 0
 }
 
 export function buildVisiblePath<T extends BranchMessage>(

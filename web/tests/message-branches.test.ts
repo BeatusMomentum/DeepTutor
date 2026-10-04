@@ -59,3 +59,14 @@ test('an explicit branch selection still overrides the deepest path', () => {
   assert.equal(visible.messages.at(-1)?.content, 'accidental branch')
   assert.deepEqual(visible.siblingsByMessageId.get(9000)?.siblingIds, [250, 9000])
 })
+
+
+test("long continuations remain visible without overflowing the call stack", () => {
+  const chain = Array.from({ length: 5000 }, (_, i) => ({ id: i + 1, parentMessageId: i === 0 ? null : i }))
+  const newerShortBranch = { id: 6000, parentMessageId: null }
+  const result = buildVisiblePath([...chain, newerShortBranch], undefined)
+  assert.equal(result.messages.length, 5000)
+  assert.equal(result.messages[0].id, 1)
+  assert.equal(result.messages.at(-1)?.id, 5000)
+  assert.deepEqual(buildVisiblePath([...chain, newerShortBranch], { null: 6000 }).messages, [newerShortBranch])
+})
