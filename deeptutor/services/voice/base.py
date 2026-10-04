@@ -175,9 +175,7 @@ def _unwrap_emphasis_for_speech(text: str) -> str:
     return out
 
 
-def strip_markdown_for_speech(
-    text: str, *, max_chars: int = 0, math_speak: bool = True
-) -> str:
+def strip_markdown_for_speech(text: str, *, max_chars: int = 0, math_speak: bool = True) -> str:
     """Reduce Markdown to plain prose suitable for TTS.
 
     Drops code blocks and tables outright (they read terribly), unwraps links

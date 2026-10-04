@@ -191,6 +191,8 @@ class EpubOutlineItem:
     locator: int
     title: str
     level: int = 1
+    source_href: str = ""
+    source_anchor: str = ""
 
 
 def is_document_extension(filename: str) -> bool:
@@ -391,12 +393,7 @@ def _extract_pdf(data: bytes, filename: str) -> str:
                         build_marker(pdf_images.collection.images[index]) for index in indices
                     ]
                 pages = [
-                    page_text
-                    + (
-                        "\n" + "\n".join(marker_by_page[i])
-                        if i in marker_by_page
-                        else ""
-                    )
+                    page_text + ("\n" + "\n".join(marker_by_page[i]) if i in marker_by_page else "")
                     for i, page_text in enumerate(pages, 1)
                 ]
                 note = pdf_images.collection.summary_note()
@@ -554,12 +551,12 @@ def _extract_pptx(data: bytes, filename: str) -> str:
         logger.info("pptx rich extraction failed on %s; falling back: %s", filename, exc)
 
     if rich is not None and any(slide.strip() for slide in rich.slides):
-        slides = [
+        rich_slides = [
             f"--- Slide {index} ---\n{slide}".rstrip()
             for index, slide in enumerate(rich.slides, 1)
             if slide.strip()
         ]
-        text = "\n\n".join(slides)
+        text = "\n\n".join(rich_slides)
         note = rich.collection.summary_note()
         if note:
             text += f"\n\n{note}"
@@ -846,10 +843,15 @@ def _epub_package_navigation(
 
     locator_by_member = {member: index for index, member in enumerate(spine_members, start=1)}
 
-    def resolve_locator(href: str, base_member: str) -> int:
-        path = unquote(href.split("#", 1)[0])
+    def resolve_target(href: str, base_member: str) -> tuple[int, str, str]:
+        raw_path, separator, raw_anchor = href.partition("#")
+        path = unquote(raw_path)
         member = posixpath.normpath(posixpath.join(posixpath.dirname(base_member), path))
-        return locator_by_member.get(member, 0)
+        return (
+            locator_by_member.get(member, 0),
+            member,
+            unquote(raw_anchor) if separator else "",
+        )
 
     rows: list[EpubOutlineItem] = []
     if nav_member:
@@ -880,9 +882,19 @@ def _epub_package_navigation(
                         )
                         href = str(link.get("href") or "") if link is not None else ""
                         title = _epub_element_text(link) if link is not None else ""
-                        locator = resolve_locator(href, nav_member) if href else 0
+                        locator, source_href, source_anchor = (
+                            resolve_target(href, nav_member) if href else (0, "", "")
+                        )
                         if locator and title:
-                            rows.append(EpubOutlineItem(locator, title, max(1, level)))
+                            rows.append(
+                                EpubOutlineItem(
+                                    locator,
+                                    title,
+                                    max(1, level),
+                                    source_href,
+                                    source_anchor,
+                                )
+                            )
                         for item in child:
                             if _local_name(item.tag) == "ol":
                                 walk_nav(item, level + 1)
@@ -910,9 +922,19 @@ def _epub_package_navigation(
                     )
                     title = _epub_element_text(label) if label is not None else ""
                     href = str(content.get("src") or "") if content is not None else ""
-                    locator = resolve_locator(href, ncx_member) if href else 0
+                    locator, source_href, source_anchor = (
+                        resolve_target(href, ncx_member) if href else (0, "", "")
+                    )
                     if locator and title:
-                        rows.append(EpubOutlineItem(locator, title, max(1, level)))
+                        rows.append(
+                            EpubOutlineItem(
+                                locator,
+                                title,
+                                max(1, level),
+                                source_href,
+                                source_anchor,
+                            )
+                        )
                     walk_ncx(point, level + 1)
 
             nav_map = next(
@@ -953,6 +975,67 @@ def extract_epub_spine(
             units.append(EpubSpineUnit(href=member, text=text, title=heading))
         outline = _epub_package_navigation(zf, filename, members)
     return tuple(units), tuple(outline)
+
+
+def normalize_epub_archive(data: bytes, filename: str) -> bytes:
+    """Return an EPUB archive that browser OCF readers can open directly.
+
+    The text extractor understands Finder-style packages with a top-level
+    directory and ``__MACOSX`` residue. Browser EPUB readers are stricter: they
+    expect ``META-INF/container.xml`` at the archive root. Repack only those
+    non-conforming archives so ordinary books keep their original bytes.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            _validate_epub_archive(zf, filename)
+            infos = [info for info in zf.infolist() if not info.is_dir()]
+            useful = [info for info in infos if not _epub_is_packaging_residue(info.filename)]
+            has_residue = len(useful) != len(infos)
+            container = next(
+                (info.filename for info in useful if info.filename.endswith(_EPUB_CONTAINER_PATH)),
+                "",
+            )
+            prefix = container[: -len(_EPUB_CONTAINER_PATH)] if container else ""
+            if prefix and not all(info.filename.startswith(prefix) for info in useful):
+                # A package document buried among unrelated root files is not
+                # a wrapped book. Leave it for the extractor's fallback path.
+                prefix = ""
+            if not prefix and not has_residue:
+                return data
+
+            output = io.BytesIO()
+            with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as normalized:
+                mimetype_name = f"{prefix}mimetype"
+                mimetype_info = next(
+                    (info for info in useful if info.filename == mimetype_name), None
+                )
+                if mimetype_info is None:
+                    normalized.writestr(
+                        "mimetype",
+                        b"application/epub+zip",
+                        compress_type=zipfile.ZIP_STORED,
+                    )
+                else:
+                    normalized.writestr(
+                        "mimetype",
+                        zf.read(mimetype_info),
+                        compress_type=zipfile.ZIP_STORED,
+                    )
+
+                for info in useful:
+                    name = info.filename[len(prefix) :] if prefix else info.filename
+                    if not name or name == "mimetype":
+                        continue
+                    normalized.writestr(name, zf.read(info), compress_type=zipfile.ZIP_DEFLATED)
+            return output.getvalue()
+    except zipfile.BadZipFile as exc:
+        raise CorruptDocumentError(
+            f"{filename}: failed to open Office ZIP package ({exc})", filename=filename
+        ) from exc
+    except OSError as exc:
+        raise CorruptDocumentError(
+            f"{filename}: failed to normalize EPUB archive ({exc})", filename=filename
+        ) from exc
 
 
 def _extract_epub(data: bytes, filename: str) -> str:
@@ -1333,9 +1416,7 @@ def extract_documents_from_records(
                     "base64": base64.b64encode(image.data).decode("ascii"),
                     "filename": f"{stem}-图{image_index_from_name(image.name)}{ext}",
                     "mime_type": image.mime_type,
-                    "id": f"{doc_id}-e{image_index_from_name(image.name):02d}"
-                    if doc_id
-                    else "",
+                    "id": f"{doc_id}-e{image_index_from_name(image.name):02d}" if doc_id else "",
                     "embedded": True,
                 }
             )

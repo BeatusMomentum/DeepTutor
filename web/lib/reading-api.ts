@@ -65,6 +65,8 @@ export interface OutlineRow {
   title: string;
   level: number;
   synthesised: boolean;
+  source_href?: string;
+  source_anchor?: string;
 }
 
 export interface MaterialDetail extends MaterialInfo {
@@ -113,6 +115,12 @@ export interface AnnotationItem {
   rects: NormalisedRect[];
   source_anchor: string;
   selectors?: ReadingTextSelector[];
+  /**
+   * Selector validity against the current content revision. Backend revision
+   * migration marks rows "unresolved" or "ambiguous" when the stored quote
+   * no longer identifies exactly one passage in the new text.
+   */
+  resolution?: "resolved" | "unresolved" | "ambiguous";
   /** "user" or "assistant" — the model can annotate too. */
   author: string;
   created_at: number;
@@ -379,6 +387,39 @@ export async function runReadingExtension(
   );
 }
 
+/**
+ * Fetch natural speech for a stored reading unit.
+ *
+ * The request deliberately carries no text: the server re-reads the material
+ * unit and is the only side that can decide what restricted learners may hear.
+ */
+export async function readReadingAloudAudio(
+  materialId: string,
+  context: { locator: number },
+): Promise<Blob> {
+  const response = await apiFetch(
+    apiUrl(`${BASE}/materials/${materialId}/read-aloud`),
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(context),
+    },
+  );
+  if (response.ok) return response.blob();
+
+  let detail = `Request failed: ${response.status}`;
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+    if (typeof body?.detail === "string" && body.detail) detail = body.detail;
+    else if (typeof body?.detail === "object" && body.detail !== null && "message" in body.detail) {
+      detail = String((body.detail as { message: unknown }).message);
+    }
+  } catch {
+    // Binary and proxy error bodies both fall back to the status message.
+  }
+  throw new Error(detail);
+}
+
 export interface ReadingQuizAnswer {
   question_id: string;
   selected_index: number;
@@ -388,6 +429,13 @@ export interface ReadingQuizAnswerVerdict {
   question_id: string;
   is_correct: boolean;
   result: "correct" | "incorrect" | "partial" | "ungraded";
+}
+
+export interface ReadingQuizReward {
+  locator: number;
+  stars: number;
+  updated_at: number;
+  awarded: boolean;
 }
 
 /**
@@ -404,10 +452,17 @@ export async function submitReadingQuizAnswers(
     section_title?: string;
     session_id?: string;
     turn_id?: string;
+    submission_id?: string;
     answers: ReadingQuizAnswer[];
   },
-): Promise<ReadingQuizAnswerVerdict[]> {
-  const data = await unwrap<{ answers?: ReadingQuizAnswerVerdict[] }>(
+): Promise<{
+  answers: ReadingQuizAnswerVerdict[];
+  reward?: ReadingQuizReward;
+}> {
+  const data = await unwrap<{
+    answers?: ReadingQuizAnswerVerdict[];
+    reward?: ReadingQuizReward;
+  }>(
     await apiFetch(
       apiUrl(`${BASE}/materials/${materialId}/extensions/quiz/answers`),
       {
@@ -419,6 +474,7 @@ export async function submitReadingQuizAnswers(
           section_title: payload.section_title || "",
           session_id: payload.session_id || "",
           turn_id: payload.turn_id || "",
+          submission_id: payload.submission_id || "",
           answers: payload.answers.map((row) => ({
             question_id: row.question_id,
             selected_index: row.selected_index,
@@ -427,12 +483,26 @@ export async function submitReadingQuizAnswers(
       },
     ),
   );
-  return data.answers ?? [];
+  return { answers: data.answers ?? [], reward: data.reward };
+}
+
+export async function listReadingQuizRewards(
+  materialId: string,
+): Promise<{ rewards: ReadingQuizReward[]; total_stars: number }> {
+  return unwrap(
+    await apiFetch(apiUrl(`${BASE}/materials/${materialId}/quiz/rewards`), {
+      cache: "no-store",
+    }),
+  );
 }
 
 /** URL of the original bytes. Served with Range support so pdf.js can stream. */
 export function rawMaterialUrl(materialId: string): string {
   return apiUrl(`${BASE}/materials/${materialId}/raw`);
+}
+
+export function renderMaterialUrl(materialId: string): string {
+  return apiUrl(`${BASE}/materials/${materialId}/render`);
 }
 
 export async function getReadingPosition(

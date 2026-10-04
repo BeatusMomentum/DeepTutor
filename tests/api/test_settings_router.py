@@ -76,30 +76,57 @@ async def test_ui_languages_are_persisted_independently(
 
 
 @pytest.mark.asyncio
-async def test_ui_settings_persist_french_independently(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
+@pytest.mark.parametrize("language", ["fr", "uk"])
+async def test_ui_settings_persist_supported_languages_independently(
+    monkeypatch: pytest.MonkeyPatch, tmp_path, language: str
 ) -> None:
     settings_file = tmp_path / "interface.json"
     monkeypatch.setattr(settings_router, "_settings_file", lambda: settings_file)
 
     response = await settings_router.update_ui_settings(
-        settings_router.UISettingsUpdate(theme="snow", language="fr", response_language="en")
+        settings_router.UISettingsUpdate(theme="snow", language=language, response_language="en")
     )
 
-    assert response["language"] == "fr"
+    assert response["language"] == language
     assert response["response_language"] == "en"
     persisted = settings_router.load_ui_settings()
-    assert persisted["language"] == "fr"
+    assert persisted["language"] == language
     assert persisted["response_language"] == "en"
+    assert (await settings_router.get_ui_settings())["language"] == language
+    assert settings_router.LanguageUpdate(language=language).language == language
 
 
 def test_ui_settings_update_rejects_unsupported_language() -> None:
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError):
-        settings_router.UISettingsUpdate(language="de")
+        settings_router.UISettingsUpdate(language="xx")
     with pytest.raises(ValidationError):
-        settings_router.UISettingsUpdate(response_language="es")
+        settings_router.UISettingsUpdate(response_language="xx")
+
+
+@pytest.mark.asyncio
+async def test_ui_accepts_extended_response_languages(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    settings_file = tmp_path / "interface.json"
+    monkeypatch.setattr(settings_router, "_settings_file", lambda: settings_file)
+
+    response = await settings_router.update_ui_settings(
+        settings_router.UISettingsUpdate(language="en", response_language="ja")
+    )
+    assert response["response_language"] == "ja"
+
+    response = await settings_router.update_ui_settings(
+        settings_router.UISettingsUpdate(response_language="pt")
+    )
+    assert response["response_language"] == "pt"
+
+    response = await settings_router.update_ui_settings(
+        settings_router.UISettingsUpdate(response_language="ms")
+    )
+    assert response["response_language"] == "ms"
+    assert settings_router.load_ui_settings()["response_language"] == "ms"
 
 
 class _FakeEmbeddingAdapter:
@@ -630,7 +657,7 @@ def test_media_and_voice_provider_choices_include_dashscope() -> None:
     )
     assert dashscope["tts"]["default_model"] == "qwen3-tts-flash"
     assert dashscope["tts"]["default_voice"] == "Cherry"
-    assert dashscope["stt"]["default_model"] == "paraformer-v2"
+    assert dashscope["stt"]["default_model"] == "paraformer-realtime-v2"
     assert dashscope["imagegen"]["default_model"] == "wanx2.1-t2i-turbo"
     assert dashscope["videogen"]["default_model"] == "wanx2.1-t2v-turbo"
 
@@ -647,6 +674,34 @@ def test_llm_provider_choices_include_unifically() -> None:
 
     assert llm["unifically"]["label"] == "Unifically"
     assert llm["unifically"]["base_url"] == "https://api.unifically.com/v1"
+
+
+def test_llm_provider_choices_include_cheaperinference() -> None:
+    llm = {item["value"]: item for item in settings_router._provider_choices()["llm"]}
+
+    assert llm["cheaperinference"]["label"] == "Cheaper Inference"
+    assert llm["cheaperinference"]["base_url"] == "https://api.cheaperinference.com/v1"
+
+
+def test_llm_provider_choices_include_api_route() -> None:
+    llm = {item["value"]: item for item in settings_router._provider_choices()["llm"]}
+
+    assert llm["api_route"]["label"] == "API Route"
+    assert llm["api_route"]["base_url"] == "https://global.api-route.com/v1"
+
+
+def test_llm_provider_choices_include_requesty() -> None:
+    llm = {item["value"]: item for item in settings_router._provider_choices()["llm"]}
+
+    assert llm["requesty"]["label"] == "Requesty"
+    assert llm["requesty"]["base_url"] == "https://router.requesty.ai/v1"
+
+
+def test_llm_provider_choices_include_futureinfra() -> None:
+    llm = {item["value"]: item for item in settings_router._provider_choices()["llm"]}
+
+    assert llm["futureinfra"]["label"] == "FutureInfra"
+    assert llm["futureinfra"]["base_url"] == "https://futureinfra.ai/v1/ai"
 
 
 def test_llm_provider_choices_include_novita() -> None:

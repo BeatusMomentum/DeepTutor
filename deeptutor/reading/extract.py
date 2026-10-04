@@ -14,7 +14,9 @@ Per-format strategy, and why:
   raw view.
 * **PPTX** — the shared extractor already emits ``--- Slide N ---`` separators,
   so we split on those instead of re-implementing python-pptx handling.
-* **everything else** (EPUB, DOCX, XLSX, TXT, MD, code, …) — the shared
+* **Markdown** — the shared extractor's text, cut at usable ATX headings and
+  then at paragraph boundaries for long sections.
+* **everything else** (EPUB, DOCX, XLSX, TXT, code, …) — the shared
   extractor's plain text, cut into fixed-size *sections* on paragraph
   boundaries.
 
@@ -57,7 +59,7 @@ SECTION_HARD_CHARS = 4200
 _SLIDE_SEPARATOR = re.compile(r"^--- Slide \d+ ---$", re.MULTILINE)
 # Title candidates: a markdown heading, or the first non-trivial line.
 _MD_HEADING = re.compile(r"^\s{0,3}(?P<marks>#{1,6})\s+(?P<title>.+?)\s*#*\s*$")
-_MD_FENCE = re.compile(r"^\s{0,3}(?P<marker>`{3,}|~{3,})")
+_MD_FENCE = re.compile(r"^\s{0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 
 # Formats whose original bytes the browser can render faithfully next to the
 # extracted text. Only PDF today; adding one means teaching the reader pane to
@@ -126,12 +128,14 @@ def _media_for_units(
     return tuple(items)
 
 
-def extract_material(path: str | Path) -> Extraction:
+def extract_material(path: str | Path, *, data: bytes | None = None) -> Extraction:
     """Cut *path* into units, dispatching on its extension.
 
     Raises :class:`ReadingError` when the file cannot be read at all, or when
     it yields no text — an image-only scan, for instance, which the reader
-    would otherwise present as an empty document with no explanation.
+    would otherwise present as an empty document with no explanation. For an
+    EPUB, ``data`` may contain already-normalized archive bytes so callers can
+    extract and store exactly what they read.
     """
     source = Path(path)
     if not source.is_file():
@@ -141,9 +145,17 @@ def extract_material(path: str | Path) -> Extraction:
     if suffix == ".pdf":
         extraction = _extract_pdf(source)
     elif suffix == ".epub":
-        extraction = _extract_epub(source)
+        if data is None:
+            try:
+                data = source.read_bytes()
+            except OSError as exc:
+                raise ReadingError(f"{source.name}: could not be read ({exc})") from exc
+        extraction = _extract_epub(data, source.name)
     elif suffix == ".pptx":
         extraction = _extract_slides(source)
+    elif suffix in {".md", ".markdown"}:
+        units, outline = split_markdown_by_headings(_shared_extract(source))
+        extraction = Extraction(units=units, unit="section", extractor="text", outline=outline)
     else:
         extraction = _extract_sections(source)
 
@@ -231,21 +243,29 @@ def _pdf_pages_with_image_markers(
     )
     return targeted, _media_for_units(targeted, pdf_images.collection.images)
 
-def _extract_epub(source: Path) -> Extraction:
+
+def _extract_epub(data: bytes, filename: str) -> Extraction:
     """Preserve EPUB spine order so browser and assistant locators agree."""
     from deeptutor.utils.document_extractor import DocumentExtractionError, extract_epub_spine
 
     try:
-        units, navigation = extract_epub_spine(source.read_bytes(), source.name)
+        units, navigation = extract_epub_spine(data, filename)
     except (OSError, DocumentExtractionError) as exc:
-        raise ReadingError(f"{source.name}: failed to read EPUB ({exc})") from exc
+        raise ReadingError(f"{filename}: failed to read EPUB ({exc})") from exc
 
     refs = tuple(
         UnitReference(locator=index, source_href=unit.href, title=unit.title)
         for index, unit in enumerate(units, start=1)
     )
     outline = tuple(
-        OutlineEntry(locator=row.locator, title=row.title, level=row.level) for row in navigation
+        OutlineEntry(
+            locator=row.locator,
+            title=row.title,
+            level=row.level,
+            source_href=row.source_href,
+            source_anchor=row.source_anchor,
+        )
+        for row in navigation
     )
     if not outline:
         outline = tuple(
@@ -435,18 +455,30 @@ def split_markdown_by_headings(
         return (), ()
 
     boundaries: list[tuple[int, int, str]] = []
+    # The run that opened the current fenced block ("```", "~~~~", ...). As in
+    # CommonMark, only a bare run of the same character that is at least as long
+    # closes it, so a ```` fence can show a ``` example and "```py" inside a
+    # block is content, not a closing fence.
     fence_marker = ""
     offset = 0
     for line in normalised.splitlines(keepends=True):
-        fence = _MD_FENCE.match(line)
+        fence = _MD_FENCE.match(line.rstrip("\n"))
         if fence:
-            marker = fence.group("marker")
+            marker, info = fence.group("marker"), fence.group("info")
             if not fence_marker:
-                fence_marker = marker[0]
-            elif marker[0] == fence_marker:
+                # A backtick fence's info string cannot contain a backtick.
+                if not (marker[0] == "`" and "`" in info):
+                    fence_marker = marker
+                    offset += len(line)
+                    continue
+            elif (
+                marker[0] == fence_marker[0]
+                and len(marker) >= len(fence_marker)
+                and not info.strip()
+            ):
                 fence_marker = ""
-            offset += len(line)
-            continue
+                offset += len(line)
+                continue
         if not fence_marker:
             heading = _MD_HEADING.match(line.rstrip("\n"))
             if heading:

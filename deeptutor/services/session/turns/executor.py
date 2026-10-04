@@ -230,6 +230,13 @@ class TurnExecutor:
             )
         )
         try:
+            # A queued turn may start after a learner's material grant changes.
+            # Recheck before prompt construction and reading-tool execution.
+            material_id = _reading_material_id(payload.get("reading_material_id"))
+            if material_id:
+                from deeptutor.multi_user.learning_access import assert_learning_material
+
+                assert_learning_material(material_id)
             from deeptutor.agents.notebook import NotebookAnalysisAgent
             from deeptutor.book.context import build_book_context
             from deeptutor.core.context import Attachment, TurnRuntimeContext, UnifiedContext
@@ -551,12 +558,14 @@ class TurnExecutor:
 
             # Persona: at most one behaviour preset per turn, eagerly
             # injected (a persona must shape the voice from the first
-            # token). Resolution: the user's own workspace first; non-admin
-            # users fall back to admin-authored presets (personas carry no
+            # token). Resolution: the user's own workspace first, then
+            # admin-authored presets for every role (personas carry no
             # privileged workflow, so no grant gate applies).
             from deeptutor.multi_user.context import get_current_user
-            from deeptutor.multi_user.paths import get_admin_path_service
-            from deeptutor.services.persona import PersonaService, get_persona_service
+            from deeptutor.services.persona import (
+                get_persona_service,
+                load_visible_for_context,
+            )
 
             current_user = get_current_user()
             learner_profile_prompt = ""
@@ -568,13 +577,14 @@ class TurnExecutor:
                 if account and str(account[1].get("preset") or "standard") == "learner":
                     learner_profile_prompt = prompt_block(account[1].get("learner_profile"))
             requested_persona = str(payload.get("persona") or "").strip()
-            persona_context = ""
-            if requested_persona:
-                persona_context = get_persona_service().load_for_context(requested_persona)
-                if not persona_context and not current_user.is_admin:
-                    persona_context = PersonaService(
-                        root=get_admin_path_service().get_workspace_dir() / "personas"
-                    ).load_for_context(requested_persona)
+            persona_context = (
+                load_visible_for_context(
+                    requested_persona,
+                    workspace=get_persona_service(),
+                )
+                if requested_persona
+                else ""
+            )
             active_persona = requested_persona if persona_context else ""
 
             from deeptutor.services.skill.runtime import skill_manifest
@@ -847,22 +857,27 @@ class TurnExecutor:
                     content=raw_user_content,
                     capability=capability_name,
                     attachments=persisted_attachment_records,
-                    metadata=_request_snapshot_metadata(
-                        payload=payload,
-                        content=raw_user_content,
-                        capability=capability_name,
-                        config=request_config,
-                        attachments=persisted_attachment_records,
-                        notebook_references=notebook_references,
-                        history_references=history_references,
-                        partner_group_references=partner_group_references,
-                        question_notebook_references=question_notebook_references,
-                        book_references=book_references,
-                        reading_references=reading_references,
-                        persona=active_persona,
-                        memory_references=memory_references,
-                        llm_selection=payload.get("llm_selection"),
-                    ),
+                    metadata={
+                        **_request_snapshot_metadata(
+                            payload=payload,
+                            content=raw_user_content,
+                            capability=capability_name,
+                            config=request_config,
+                            attachments=persisted_attachment_records,
+                            notebook_references=notebook_references,
+                            history_references=history_references,
+                            partner_group_references=partner_group_references,
+                            question_notebook_references=question_notebook_references,
+                            book_references=book_references,
+                            reading_references=reading_references,
+                            persona=active_persona,
+                            memory_references=memory_references,
+                            llm_selection=payload.get("llm_selection"),
+                        ),
+                        # A recovered worker_lost turn may never have an
+                        # assistant row. Keep its exact user-row association.
+                        "turn_id": turn_id,
+                    },
                     **parent_kwargs,
                 )
 
@@ -904,6 +919,7 @@ class TurnExecutor:
                     "conversation_context_text": conversation_context_text,
                     "history_token_count": history_result.token_count,
                     "history_budget": history_result.budget,
+                    "reply_language_fixed": bool(payload.get("_reply_language_fixed")),
                     "turn_id": turn_id,
                     "question_followup_context": followup_question_context or {},
                     "selection_tutor_context": selection_tutor_context or {},
@@ -928,6 +944,10 @@ class TurnExecutor:
                     "mastery_card_grade": mastery_card_grade or {},
                     # The question this turn opened by dropping, if it did.
                     "mastery_card_skip": mastery_card_skip or {},
+                    # Whether the message is a pick on the open card at all,
+                    # graded or not: "A" is an answer, not something to search.
+                    "mastery_card_answered": workspace_mode == WORKSPACE_MODE_MASTERY
+                    and bool(payload.get("mastery_answer")),
                     "mastery_path_lease_managed": mastery_lease_managed,
                     # Immersive reading: the open material activates the reading
                     # capability and binds its tools; the viewport tells the
@@ -1081,6 +1101,21 @@ class TurnExecutor:
                     events=[],
                     attachments=generated_attachments or None,
                     parent_message_id=branch_parent_id,
+                    metadata=assistant_provider_metadata,
+                )
+            elif is_regenerate and payload.get("regenerated_from_message_id") is not None:
+                # Regenerate reuses the saved user row. PocketBase ids are
+                # strings, so they cannot travel through the SQLite-only
+                # parent_message_id request field, but the assistant still
+                # needs an explicit link to hide an older failed attempt.
+                assistant_message_id = await self.store.add_message(
+                    session_id=session_id,
+                    role="assistant",
+                    content=assistant_content,
+                    capability=capability_name,
+                    events=[],
+                    attachments=generated_attachments or None,
+                    parent_message_id=payload["regenerated_from_message_id"],
                     metadata=assistant_provider_metadata,
                 )
             else:

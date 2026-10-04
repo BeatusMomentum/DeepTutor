@@ -211,7 +211,7 @@ def _clear_detached_runtime(paths: DetachedLauncherPaths, token: str) -> None:
         paths.stop.unlink(missing_ok=True)
 
 
-def _no_window_kwargs() -> dict[str, int]:
+def _no_window_kwargs() -> dict[str, Any]:
     """``Popen`` keywords that keep Windows from allocating a console window.
 
     The detached worker runs with ``DETACHED_PROCESS``, i.e. with no console of
@@ -345,12 +345,13 @@ def _port_listeners(port: int) -> list[tuple[int, str]]:
             check=False,
             capture_output=True,
             text=True,
+            errors="replace",
             timeout=3,
         )
     except Exception:
         return []
     pids: list[int] = []
-    for line in completed.stdout.splitlines():
+    for line in (completed.stdout or "").splitlines():
         if not line.startswith("p"):
             continue
         try:
@@ -372,13 +373,14 @@ def _port_listeners_windows(port: int) -> list[tuple[int, str]]:
             check=False,
             capture_output=True,
             text=True,
+            errors="replace",
             timeout=5,
             **_no_window_kwargs(),
         )
     except Exception:
         return []
     pids: list[int] = []
-    for line in completed.stdout.splitlines():
+    for line in (completed.stdout or "").splitlines():
         parts = line.split()
         if len(parts) < 5 or parts[0].upper() != "TCP" or parts[3].upper() != "LISTENING":
             continue
@@ -401,10 +403,11 @@ def _port_listeners_windows(port: int) -> list[tuple[int, str]]:
                     check=False,
                     capture_output=True,
                     text=True,
+                    errors="replace",
                     timeout=3,
                     **_no_window_kwargs(),
                 )
-                first = result.stdout.strip().splitlines()[:1]
+                first = (result.stdout or "").strip().splitlines()[:1]
                 if first and first[0].startswith('"'):
                     name = first[0].split('","')[0].strip('"')
             except Exception:
@@ -971,11 +974,12 @@ def _process_command(pid: int | None) -> str:
             check=False,
             capture_output=True,
             text=True,
+            errors="replace",
             timeout=2,
         )
     except Exception:
         return ""
-    return completed.stdout.strip()
+    return (completed.stdout or "").strip()
 
 
 def _looks_like_next_process(pid: int | None) -> bool:
@@ -1214,8 +1218,10 @@ def _handoff_pending_update(
     """Hand a pending Web update to a detached worker before shutdown."""
 
     from deeptutor.services.app_update import (
+        SYSTEMD_UPDATE_REASON,
         UpdateJobStore,
         launch_update_worker,
+        running_under_systemd_service,
         update_store_root,
     )
 
@@ -1225,6 +1231,14 @@ def _handoff_pending_update(
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
         return False
     if job.status != "pending":
+        return False
+    # A pending job from an older backend can reach this launcher despite the
+    # API guard. Keep the service alive: setsid does not leave its cgroup.
+    if running_under_systemd_service():
+        try:
+            store.mark_failed(job.id, SYSTEMD_UPDATE_REASON)
+        except Exception as exc:
+            _log(f"Could not record rejected systemd update: {exc}")
         return False
     try:
         store.prepare_handoff(

@@ -22,7 +22,8 @@ from typing import Any
 
 from deeptutor.reading.store import ReadingStore
 from deeptutor.services.config.runtime_settings import load_document_parsing_settings
-from deeptutor.services.llm.client import get_llm_client
+from deeptutor.services.llm.image_caption_cache import complete_image_caption
+from deeptutor.services.llm.image_description import get_image_description_client
 from deeptutor.services.rag.pipelines.llamaindex.config import image_description_limits
 
 logger = logging.getLogger(__name__)
@@ -65,25 +66,19 @@ async def caption_material_media(
     """
     store = store or ReadingStore()
     rows = store.media_items(material_id)
-    pending = [
-        row
-        for row in rows
-        if force or not str(row.get("caption") or "").strip()
-    ]
+    pending = [row for row in rows if force or not str(row.get("caption") or "").strip()]
     if limit is not None:
         pending = pending[: max(0, int(limit))]
     if not pending:
         return 0
 
     try:
-        client = get_llm_client()
+        client = get_image_description_client()
     except Exception as exc:  # noqa: BLE001 - the client may not be configured
         logger.warning("Image captioning skipped: LLM client is unavailable (%s)", exc)
         return 0
     if not client.supports_multimodal_images():
-        logger.warning(
-            "Image captioning skipped: the configured LLM does not accept image input."
-        )
+        logger.warning("Image captioning skipped: the configured LLM does not accept image input.")
         return 0
 
     concurrency, timeout_seconds = image_description_limits()
@@ -103,19 +98,19 @@ async def caption_material_media(
                 data = await asyncio.to_thread(path.read_bytes)
                 encoded = base64.b64encode(data).decode("ascii")
                 text = await asyncio.wait_for(
-                    client.complete(
+                    complete_image_caption(
+                        client,
                         CAPTION_PROMPT,
                         system_prompt=CAPTION_SYSTEM_PROMPT,
                         image_data=encoded,
                         image_mime_type=mime,
                         image_filename=name,
+                        force=force,
                     ),
                     timeout=timeout_seconds,
                 )
         except asyncio.TimeoutError:
-            logger.warning(
-                "Image captioning timed out after %ss: %s", timeout_seconds, name
-            )
+            logger.warning("Image captioning timed out after %ss: %s", timeout_seconds, name)
             return None
         except Exception as exc:  # noqa: BLE001 - one bad image must not sink the rest
             logger.warning("Image captioning failed for %s: %s", name, exc)
@@ -126,9 +121,7 @@ async def caption_material_media(
             return None
         return name, caption
 
-    results = await asyncio.gather(
-        *(_caption_one(row) for row in pending), return_exceptions=True
-    )
+    results = await asyncio.gather(*(_caption_one(row) for row in pending), return_exceptions=True)
     captions: dict[str, str] = {}
     for result in results:
         if isinstance(result, BaseException):
