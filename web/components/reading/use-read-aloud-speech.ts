@@ -4,22 +4,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { readReadingAloudAudio } from "@/lib/reading-api";
 
-/**
- * Play server speech for a verified reading unit, with browser speech as the
- * offline/no-provider fallback. A token keeps late audio responses from
- * starting after the reader has navigated away or pressed stop.
- */
+type Playback = { audio: HTMLAudioElement; url: string; disposed: boolean };
+
+/** Play verified server speech, falling back to browser speech when unavailable. */
 export function useReadAloudSpeech() {
   const [speaking, setSpeaking] = useState(false);
   const tokenRef = useRef(0);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
+  const playbackRef = useRef<Playback | null>(null);
 
-  const disposeAudio = useCallback(() => {
-    audioRef.current?.pause();
-    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-    audioRef.current = null;
-    audioUrlRef.current = null;
+  const disposeAudio = useCallback((playback = playbackRef.current) => {
+    if (!playback) return;
+    if (!playback.disposed) {
+      playback.disposed = true;
+      playback.audio.onended = null;
+      playback.audio.onerror = null;
+      playback.audio.pause();
+      URL.revokeObjectURL(playback.url);
+    }
+    if (playbackRef.current === playback) playbackRef.current = null;
   }, []);
 
   const stop = useCallback(() => {
@@ -29,15 +31,14 @@ export function useReadAloudSpeech() {
     setSpeaking(false);
   }, [disposeAudio]);
 
-  useEffect(() => disposeAudio, [disposeAudio]);
+  useEffect(() => () => {
+    tokenRef.current += 1;
+    disposeAudio();
+    window.speechSynthesis?.cancel();
+  }, [disposeAudio]);
 
   const speak = useCallback(
-    async ({
-      materialId,
-      locator,
-      locale,
-      fallbackText,
-    }: {
+    async ({ materialId, locator, locale, fallbackText }: {
       materialId: string;
       locator: number;
       locale: string;
@@ -46,33 +47,30 @@ export function useReadAloudSpeech() {
       const token = ++tokenRef.current;
       disposeAudio();
       window.speechSynthesis?.cancel();
+      setSpeaking(false);
+      let playback: Playback | null = null;
       try {
         const blob = await readReadingAloudAudio(materialId, { locator });
         if (tokenRef.current !== token || !blob.size) return false;
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
-        audioUrlRef.current = url;
-        audioRef.current = audio;
-        audio.onended = () => {
-          if (tokenRef.current === token) {
-            disposeAudio();
-            setSpeaking(false);
-          }
+        playback = { audio, url, disposed: false };
+        playbackRef.current = playback;
+        const finished = () => {
+          disposeAudio(playback);
+          if (tokenRef.current === token) setSpeaking(false);
         };
-        audio.onerror = () => {
-          if (tokenRef.current === token) {
-            disposeAudio();
-            setSpeaking(false);
-          }
-        };
+        audio.onended = finished;
+        audio.onerror = finished;
         await audio.play();
         if (tokenRef.current !== token) {
-          disposeAudio();
+          disposeAudio(playback);
           return true;
         }
-        setSpeaking(true);
+        if (!playback.disposed) setSpeaking(true);
         return true;
       } catch {
+        disposeAudio(playback);
         if (tokenRef.current !== token) return true;
       }
 
