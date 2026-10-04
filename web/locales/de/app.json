@@ -5272,5 +5272,6 @@
   "Review move": "Verschiebung prüfen",
   "{{count}} files · {{bytes}} bytes": "{{count}} Dateien · {{bytes}} Bytes",
   "Assignments updated: {{names}}": "Aktualisierte Zuweisungen: {{names}}",
-  "Could not search chat history. Try again.": "Der Chatverlauf konnte nicht durchsucht werden. Versuche es erneut."
+  "Could not search chat history. Try again.": "Der Chatverlauf konnte nicht durchsucht werden. Versuche es erneut.",
+  "Quiz stars: {{count}}": "Quiz-Sterne: {{count}}"
 }

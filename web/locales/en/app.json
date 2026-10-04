@@ -5272,5 +5272,6 @@
   "Review move": "Review move",
   "{{count}} files · {{bytes}} bytes": "{{count}} files · {{bytes}} bytes",
   "Assignments updated: {{names}}": "Assignments updated: {{names}}",
-  "Could not search chat history. Try again.": "Could not search chat history. Try again."
+  "Could not search chat history. Try again.": "Could not search chat history. Try again.",
+  "Quiz stars: {{count}}": "Quiz stars: {{count}}"
 }

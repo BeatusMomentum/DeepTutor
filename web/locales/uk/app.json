@@ -5288,5 +5288,6 @@
   "Review move": "Перевірити переміщення",
   "{{count}} files · {{bytes}} bytes": "{{count}} файлів · {{bytes}} байтів",
   "Assignments updated: {{names}}": "Оновлені призначення: {{names}}",
-  "Could not search chat history. Try again.": "Не вдалося виконати пошук в історії чатів. Спробуйте ще раз."
+  "Could not search chat history. Try again.": "Не вдалося виконати пошук в історії чатів. Спробуйте ще раз.",
+  "Quiz stars: {{count}}": "Зірки за тест: {{count}}"
 }

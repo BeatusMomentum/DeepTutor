@@ -5272,5 +5272,6 @@
   "Review move": "检查移动详情",
   "{{count}} files · {{bytes}} bytes": "{{count}} 个文件 · {{bytes}} 字节",
   "Assignments updated: {{names}}": "将更新以下工作区的分配：{{names}}",
-  "Could not search chat history. Try again.": "无法搜索聊天记录，请重试。"
+  "Could not search chat history. Try again.": "无法搜索聊天记录，请重试。",
+  "Quiz stars: {{count}}": "测验星星：{{count}}"
 }
