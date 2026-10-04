@@ -71,6 +71,22 @@ This change versions the cloud parser signature so older merged page indices
 are not reused from the normal parse cache. Existing knowledge-base indexes
 need an explicit rebuild to consume corrected pages.
 
+## Retrying local MinerU documents
+
+Local MinerU retries restart the interrupted document from its beginning;
+the CLI does not expose a reliable checkpoint inside an inference call.
+Compatible completed document parses remain reusable after retry or restart,
+including when only the embedding configuration changes. Empty or unreadable
+cached output is reparsed rather than accepted as complete.
+
+New local output is checked for usable markdown or content blocks before it
+replaces an existing parse. Failed attempts retain their artifacts for
+diagnosis. Within the workspace parse cache these are moved to hidden
+`.failed-` directories beside the affected signature, outside the next retry's
+working directory. They are never treated as completed cache entries. Clearing
+the workspace parse cache also removes these diagnostic artifacts. An interrupted
+local child process is stopped before the caller starts another attempt.
+
 ## Tiny scanned PDF pages with MinerU
 
 Some scanned PDFs encode a full-resolution page in an unusually small physical
