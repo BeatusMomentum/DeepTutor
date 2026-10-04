@@ -13,7 +13,7 @@ Two failure modes covered:
 
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 import pytest
 
@@ -556,8 +556,9 @@ def test_set_preset_checks_expected_user_id(mu_isolated_root, seed_user) -> None
 
 
 @pytest.mark.parametrize("surfaces, expected", [(["reading"], 200), (["chat"], 403)])
+@pytest.mark.parametrize("nested_router", [False, True])
 def test_learner_proxy_list_obeys_reading_policy_over_http(
-    monkeypatch, mu_isolated_root, surfaces, expected
+    monkeypatch, mu_isolated_root, surfaces, expected, nested_router
 ) -> None:
     from deeptutor.api.routers import auth, knowledge
     from deeptutor.multi_user import learning_access
@@ -582,13 +583,16 @@ def test_learner_proxy_list_obeys_reading_policy_over_http(
 
     monkeypatch.setattr(knowledge, "list_knowledge_bases", collection)
     app = FastAPI()
-    app.include_router(
+    parent = APIRouter() if nested_router else app
+    parent.include_router(
         knowledge.router, prefix="/api", dependencies=[Depends(auth.require_learning_surface)]
     )
+    if nested_router:
+        app.include_router(parent)
     client = TestClient(app)
     headers = {"Authorization": "Bearer student-token"}
     response = client.get("/api/knowledge-bases/list", headers=headers)
-    assert response.status_code == expected
+    assert response.status_code == expected, response.text
     assert calls == ([True] if expected == 200 else [])
     if expected == 200:
         assert response.json() == []

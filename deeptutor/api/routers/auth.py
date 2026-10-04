@@ -671,6 +671,21 @@ def _learning_surface_for_path(
     return ""
 
 
+def _resolved_route_path(request: Request) -> str | None:
+    """Keep include-time prefixes across FastAPI's flat and lazy routers."""
+    # Lazy router inclusion retains the original route in scope["route"].
+    # Its path omits include_router prefixes; the effective context owns the
+    # full matched template. Direct routes and older releases use the route.
+    fastapi_scope = request.scope.get("fastapi")
+    if isinstance(fastapi_scope, dict):
+        context = fastapi_scope.get("effective_route_context")
+        path = getattr(context, "path", None)
+        if isinstance(path, str):
+            return path
+    path = getattr(request.scope.get("route"), "path", None)
+    return path if isinstance(path, str) else None
+
+
 async def require_learning_surface(
     request: Request,
     _: TokenPayload | None = Depends(require_auth),
@@ -679,12 +694,11 @@ async def require_learning_surface(
     from deeptutor.multi_user.learning_access import assert_learning_surface
 
     try:
-        route = request.scope.get("route")
         assert_learning_surface(
             _learning_surface_for_path(
                 request.url.path,
                 request.method,
-                route_path=getattr(route, "path", None),
+                route_path=_resolved_route_path(request),
             )
         )
     except PermissionError as exc:
