@@ -2900,6 +2900,7 @@ export default function ChatWorkspace({
             />
             <QuestionBankPicker
               open={showQuestionBankPicker}
+              initialSelected={selectedQuestionEntries}
               onClose={handleCloseQuestionBankPicker}
               onApply={handleApplyQuestionEntries}
             />
