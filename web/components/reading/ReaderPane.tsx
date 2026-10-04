@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { browserStorage } from "@/shared/storage";
 import Tooltip from "@/shared/ui/Tooltip";
 
@@ -40,7 +41,6 @@ import {
 import { AnnotationList } from "./AnnotationList";
 import { AnnotationPopover, type PopoverAiAction } from "./AnnotationPopover";
 import { passagePrompts } from "@/lib/reading-passage-prompts";
-import { EpubDocumentView } from "./EpubDocumentView";
 import {
   PdfDocumentView,
   type JumpRequest,
@@ -68,6 +68,20 @@ import {
   type ReadingLocationEntry,
   type ReadingLocationHistory,
 } from "@/lib/reading-location-history";
+
+function EpubLoading() {
+  const { t } = useTranslation();
+  return (
+    <div role="status" aria-label={t("Loading")} className="flex h-full items-center justify-center">
+      <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-[var(--muted-foreground)]" />
+    </div>
+  );
+}
+
+const EpubDocumentView = dynamic(
+  () => import("./EpubDocumentView").then(module => module.EpubDocumentView),
+  { ssr: false, loading: EpubLoading },
+);
 
 /** Event the reader dispatches to prefill the composer from a selection. */
 export const READER_ASK_EVENT = "dt:reader-ask";

@@ -1,5 +1,6 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
@@ -54,9 +55,22 @@ import {
 } from '@/lib/video-learning-marks'
 import { stepTranscriptMatch, transcriptMatchIndexes } from '@/lib/transcript-search'
 import { videoTimeFromHref } from '@/lib/watching-citations'
-import { WatchingMarksPanel } from './WatchingMarksPanel'
 import { WatchingPlayer } from './WatchingPlayer'
 import { transcriptFollowScrollTop } from '@/lib/transcript-follow'
+
+function MarksLoading() {
+  const { t } = useTranslation()
+  return (
+    <div role="status" aria-label={t('Loading')} className="flex justify-center py-4">
+      <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-[var(--muted-foreground)]" />
+    </div>
+  )
+}
+
+const WatchingMarksPanel = dynamic(
+  () => import('./WatchingMarksPanel').then(module => module.WatchingMarksPanel),
+  { ssr: false, loading: MarksLoading },
+)
 
 export const WATCHING_ASK_EVENT = 'dt:watching-ask'
 
