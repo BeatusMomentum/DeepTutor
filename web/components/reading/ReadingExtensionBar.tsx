@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { fetchAuthStatus } from "@/lib/auth";
+import { randomUuid } from "@/lib/random-uuid";
 import { getOwnLearnerProfile } from "@/lib/profile-api";
 import {
   primaryReadingActionRank,
@@ -496,7 +497,7 @@ function QuizQuestions({
     const questionId = question.id || `q_${index + 1}`;
     const key = question.id || String(index);
     const pending = pendingSubmissions.current[key];
-    const submissionId = pending?.selected === choiceIndex ? pending.id : crypto.randomUUID();
+    const submissionId = pending?.selected === choiceIndex ? pending.id : randomUuid();
     pendingSubmissions.current[key] = { selected: choiceIndex, id: submissionId };
     setSaving((current) => ({ ...current, [key]: true }));
     try {
