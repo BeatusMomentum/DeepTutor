@@ -274,3 +274,49 @@ async def test_batch_deadline_covers_split_fallback(tmp_path, monkeypatch):
     assert len(calls) == 2  # canceled first single fallback; second is never sent
     assert time.monotonic() - start < 0.8
     assert progress == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_cached_batch_ingestion_keeps_source_alignment_and_reports_all_progress(
+    tmp_path, monkeypatch
+):
+    from types import SimpleNamespace
+
+    from deeptutor.services.llm import image_caption_cache
+    from deeptutor.services.llm.config import LLMConfig
+    from deeptutor.services.rag.pipelines.llamaindex import document_loader as loader_module
+
+    calls = []
+
+    async def complete(prompt, **kwargs):
+        calls.append(kwargs)
+        return json.dumps(
+            {
+                "captions": [
+                    {"image_id": "IMAGE_1", "caption": "second"},
+                    {"image_id": "IMAGE_0", "caption": "first"},
+                ]
+            }
+        )
+
+    _install_multimodal_clients(monkeypatch, complete_fn=complete)
+    client = loader_module.get_image_description_client()
+    client.config = LLMConfig(model="vision", api_key="test", base_url="https://example.test/v1")
+    monkeypatch.setattr(loader_module, "get_image_description_client", lambda: client)
+    monkeypatch.setattr(loader_module, "image_description_batch_size", lambda: 2)
+    monkeypatch.setattr(
+        image_caption_cache,
+        "get_path_service",
+        lambda: SimpleNamespace(get_parse_cache_root=lambda: tmp_path / "cache"),
+    )
+    paths = _make_images(tmp_path, ["a.png", "b.png"])
+    for _ in range(2):
+        progress = []
+        docs = await loader_module.LlamaIndexDocumentLoader().load(
+            [str(p) for p in paths],
+            image_progress_callback=lambda n, total: progress.append((n, total)),
+        )
+        assert [d.metadata["file_name"] for d in docs] == ["a.png", "b.png"]
+        assert [d.text for d in docs] == ["[Image] a.png\n\nfirst", "[Image] b.png\n\nsecond"]
+        assert progress == [(1, 2), (2, 2)]
+    assert len(calls) == 1

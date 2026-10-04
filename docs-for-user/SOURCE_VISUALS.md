@@ -49,7 +49,10 @@ limits stop queued groups in the job; other API/transport errors do not split.
 This only affects subsequently processed images in the existing LlamaIndex
 description pass. It does not enable descriptions for structured source visuals
 or alter reading-material captions. Batches use a different structured prompt
-and do not reuse the independent single-image caption cache. Setting the size
+and cache complete, successful groups separately from independent single-image
+captions. The digest includes ordered image contents and metadata, prompts,
+model identity, and retry policy. Failed, incomplete, or canceled groups are
+not cached; successful split groups can be reused. Setting the size
 back to `1` restores the normal single-image path. The model must support
 multiple image blocks; unsupported API responses are reported without a burst
 of fallback requests.

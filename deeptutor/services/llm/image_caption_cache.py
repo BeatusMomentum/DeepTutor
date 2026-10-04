@@ -1,4 +1,4 @@
-"""Best-effort, workspace-scoped caching for individual image descriptions.
+"""Best-effort, workspace-scoped caching for image descriptions.
 
 Only successful, nonempty captions are cached. The digest covers the complete
 request and model identity; only the digest and caption are written to disk,
@@ -9,6 +9,7 @@ never image bytes, prompts, endpoint URLs, headers, or credentials. Removing
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 import hashlib
 import json
 import logging
@@ -126,3 +127,72 @@ async def complete_image_caption(
     if path is not None and caption:
         await asyncio.to_thread(_write_caption, path, caption)
     return caption
+
+
+def _read_batch_captions(path: Path, count: int) -> list[str] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or payload.get("version") != _CACHE_VERSION:
+            return None
+        captions = payload.get("captions")
+        if (
+            isinstance(captions, list)
+            and len(captions) == count
+            and all(isinstance(caption, str) and caption.strip() for caption in captions)
+        ):
+            return [caption.strip() for caption in captions]
+    except (OSError, ValueError, UnicodeError):
+        pass
+    return None
+
+
+def _write_batch_captions(path: Path, captions: list[str]) -> None:
+    try:
+        atomic_write_json(path, {"version": _CACHE_VERSION, "captions": captions})
+    except OSError:
+        logger.debug("Image caption batch cache write failed; retaining generated captions")
+
+
+async def complete_image_caption_batch(
+    client: Any,
+    images: list[dict[str, str]],
+    *,
+    prompt: str,
+    system_prompt: str,
+    generate: Callable[[], Awaitable[list[str | None]]],
+) -> list[str | None]:
+    """Cache complete successful groups using their exact request identity.
+
+    Image order and metadata, the structured prompt, and the bounded retry
+    policy are part of the digest. Batch entries remain separate from ordinary
+    single-image captions. Partial failures, errors and cancellation are never
+    cached; split groups can independently reuse their successful entries.
+    """
+    request = {
+        "prompt": prompt,
+        "system_prompt": system_prompt,
+        "image_data": json.dumps(
+            [{key: image[key] for key in ("base64", "mimetype", "filename")} for image in images],
+            sort_keys=True,
+            ensure_ascii=True,
+            separators=(",", ":"),
+        ),
+        "batch_format": "id_checked_v1",
+        "max_retries": "0",
+        "allow_image_fallback": "false",
+    }
+    path = await asyncio.to_thread(_cache_path, client, request)
+    if path is not None:
+        cached = await asyncio.to_thread(_read_batch_captions, path, len(images))
+        if cached is not None:
+            return cached
+    captions = await generate()
+    if (
+        path is not None
+        and len(captions) == len(images)
+        and all(isinstance(caption, str) and caption.strip() for caption in captions)
+    ):
+        await asyncio.to_thread(
+            _write_batch_captions, path, [caption.strip() for caption in captions]
+        )
+    return captions

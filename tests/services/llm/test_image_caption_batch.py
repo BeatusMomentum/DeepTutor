@@ -161,3 +161,84 @@ async def test_settings_roundtrip_clamps_and_preserves_omitted_fields(tmp_path, 
         knowledge.LlamaIndexConfigUpdate(image_description_batch_size=0)
     )
     assert rag_config.image_description_batch_size() == 1
+
+
+@pytest.fixture
+def batch_cache(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    from deeptutor.services.llm import image_caption_cache
+
+    monkeypatch.setattr(
+        image_caption_cache,
+        "get_path_service",
+        lambda: SimpleNamespace(get_parse_cache_root=lambda: tmp_path),
+    )
+    return tmp_path
+
+
+def cached_client(mode="valid"):
+    from deeptutor.services.llm.config import LLMConfig
+
+    client = Client(mode)
+    client.config = LLMConfig(
+        model="vision", api_key="test-secret", base_url="https://example.test/v1"
+    )
+    return client
+
+
+@pytest.mark.asyncio
+async def test_batch_cache_preserves_request_identity_and_contains_only_captions(batch_cache):
+    client = cached_client()
+    group = images(2)
+    expected = ["IMAGE_0 caption", "IMAGE_1 caption"]
+    assert await batcher(client).describe(group) == expected
+    assert await batcher(client).describe(group) == expected
+    assert len(client.calls) == 1
+    for path in batch_cache.rglob("*.json"):
+        payload = path.read_text()
+        assert json.loads(payload) == {"version": 1, "captions": expected}
+        assert not any(
+            secret in payload + str(path)
+            for secret in ("test-secret", "example.test", "data0", "Be factual")
+        )
+    await batcher(client).describe(list(reversed(group)))
+    client.config.model = "other-vision"
+    await batcher(client).describe(group)
+    await ImageCaptionBatcher(client, prompt="Read labels", system_prompt="Be factual").describe(
+        group
+    )
+    assert len(client.calls) == 4
+
+
+@pytest.mark.asyncio
+async def test_successful_split_result_is_reused_without_new_provider_requests(batch_cache):
+    client = cached_client("invalid")
+    expected = [f"single {i}.png" for i in range(4)]
+    assert await batcher(client).describe(images(4)) == expected
+    assert len(client.calls) == 7
+    assert await batcher(client).describe(images(4)) == expected
+    assert len(client.calls) == 7
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "error",
+    [
+        LLMAuthenticationError(),
+        LLMRateLimitError(),
+        LLMAPIError("down", status_code=503),
+        asyncio.CancelledError(),
+    ],
+)
+async def test_failed_or_canceled_batch_is_retried_on_next_job(batch_cache, error):
+    client = cached_client(error)
+    if isinstance(error, asyncio.CancelledError):
+        with pytest.raises(asyncio.CancelledError):
+            await batcher(client).describe(images(2))
+    else:
+        assert await batcher(client).describe(images(2)) == [None, None]
+    assert not list(batch_cache.rglob("*.json"))
+    client.mode = "valid"
+    assert await batcher(client).describe(images(2)) == ["IMAGE_0 caption", "IMAGE_1 caption"]
+    assert len(client.calls) == 2

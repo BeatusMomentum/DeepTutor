@@ -12,6 +12,7 @@ from .exceptions import (
     LLMRateLimitError,
     ProviderContextWindowError,
 )
+from .image_caption_cache import complete_image_caption_batch
 
 logger = logging.getLogger(__name__)
 _BATCH_INSTRUCTIONS = (
@@ -71,6 +72,15 @@ class ImageCaptionBatcher:
     async def describe(self, images: list[dict[str, str]]) -> list[str | None]:
         if not images or self.halted:
             return [None] * len(images)
+        return await complete_image_caption_batch(
+            self.client,
+            images,
+            prompt=self.prompt,
+            system_prompt=self.system_prompt + (_BATCH_INSTRUCTIONS if len(images) > 1 else ""),
+            generate=lambda: self._describe_uncached(images),
+        )
+
+    async def _describe_uncached(self, images: list[dict[str, str]]) -> list[str | None]:
         try:
             if len(images) == 1:
                 image = images[0]
