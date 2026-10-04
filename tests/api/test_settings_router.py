@@ -690,6 +690,13 @@ def test_llm_provider_choices_include_api_route() -> None:
     assert llm["api_route"]["base_url"] == "https://global.api-route.com/v1"
 
 
+def test_llm_provider_choices_include_requesty() -> None:
+    llm = {item["value"]: item for item in settings_router._provider_choices()["llm"]}
+
+    assert llm["requesty"]["label"] == "Requesty"
+    assert llm["requesty"]["base_url"] == "https://router.requesty.ai/v1"
+
+
 def test_llm_provider_choices_include_novita() -> None:
     llm = {item["value"]: item for item in settings_router._provider_choices()["llm"]}
 

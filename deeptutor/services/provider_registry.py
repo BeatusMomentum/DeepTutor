@@ -321,6 +321,16 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://global.api-route.com/v1",
     ),
     ProviderSpec(
+        name="requesty",
+        keywords=("requesty",),
+        env_key="REQUESTY_API_KEY",
+        display_name="Requesty",
+        backend="openai_compat",
+        is_gateway=True,
+        detect_by_base_keyword="requesty",
+        default_api_base="https://router.requesty.ai/v1",
+    ),
+    ProviderSpec(
         name="volcengine",
         keywords=("volcengine", "volces", "ark"),
         env_key="OPENAI_API_KEY",
