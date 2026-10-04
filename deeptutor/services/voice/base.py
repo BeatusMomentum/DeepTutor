@@ -159,9 +159,8 @@ _BLANK_LINES = re.compile(r"\n{3,}")
 def _unwrap_emphasis_for_speech(text: str) -> str:
     """Turn Markdown bold/italic/strike into plain words.
 
-    Voice models otherwise speak ``*`` as "asterisk". Math must already have
-    been verbalized so TeX ``*`` / ``_`` inside ``$…$`` is not treated as
-    emphasis. Leftover unmatched ``**`` markers are dropped; a remaining
+    Voice models otherwise speak ``*`` as "asterisk". Call this on verbalized
+    math, or only on prose segments when math verbalization is disabled. Leftover unmatched ``**`` markers are dropped; a remaining
     single ``*`` is turned into a space so "asterisk" is never read.
     """
     out = _BOLD_STARS.sub(r"\1", text)
@@ -200,8 +199,13 @@ def strip_markdown_for_speech(text: str, *, max_chars: int = 0, math_speak: bool
     # Math before emphasis: TeX uses `_` / `*` as scripts and products, and
     # the emphasis regex would otherwise pair a prose underscore with one
     # inside `$x_i$`.
-    out = verbalize_latex_for_speech(out, math_speak=math_speak)
-    out = _unwrap_emphasis_for_speech(out)
+    out = verbalize_latex_for_speech(
+        out,
+        math_speak=math_speak,
+        prose_transform=_unwrap_emphasis_for_speech if not math_speak else None,
+    )
+    if math_speak:
+        out = _unwrap_emphasis_for_speech(out)
     out = _WHITESPACE.sub(" ", out)
     out = _BLANK_LINES.sub("\n\n", out).strip()
     if max_chars and len(out) > max_chars:

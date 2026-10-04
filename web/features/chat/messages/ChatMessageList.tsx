@@ -1294,7 +1294,7 @@ export function CopyActionButton({
 
 // Speaker button: synthesizes this one reply and plays it. Auto-play of later
 // replies is a Settings preference (`autoPlayFresh`), not a first-click prompt.
-let stopActivePlayback: (() => void) | null = null;
+let activePlayback: { owner: object; stop: () => void } | null = null;
 
 async function ttsErrorMessage(resp: Response): Promise<string> {
   try {
@@ -1327,6 +1327,7 @@ export function PlayAudioButton({
   const abortRef = useRef<AbortController | null>(null);
   const genRef = useRef(0);
   const autoPlayedRef = useRef(false);
+  const playbackOwnerRef = useRef<object>({});
 
   const cleanup = useCallback(() => {
     abortRef.current?.abort();
@@ -1345,16 +1346,16 @@ export function PlayAudioButton({
     genRef.current += 1;
     cleanup();
     setState("idle");
-    if (stopActivePlayback === stop) stopActivePlayback = null;
+    if (activePlayback?.owner === playbackOwnerRef.current) activePlayback = null;
   }, [cleanup]);
 
   const play = useCallback(async () => {
-    stopActivePlayback?.();
+    activePlayback?.stop();
     const gen = ++genRef.current;
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
-    stopActivePlayback = stop;
+    activePlayback = { owner: playbackOwnerRef.current, stop };
     setState("loading");
     try {
       const resp = await apiFetch(apiUrl("/api/voice/tts"), {
@@ -1387,7 +1388,7 @@ export function PlayAudioButton({
         if (gen !== genRef.current) return;
         setState("idle");
         cleanup();
-        if (stopActivePlayback === stop) stopActivePlayback = null;
+        if (activePlayback?.owner === playbackOwnerRef.current) activePlayback = null;
       };
       audio.onerror = () => {
         if (gen !== genRef.current) return;
@@ -1430,7 +1431,11 @@ export function PlayAudioButton({
     return () => window.clearTimeout(id);
   }, [autoPlayFresh, autoplayEnabled, content, play]);
 
-  useEffect(() => cleanup, [cleanup]);
+  useEffect(() => () => {
+    genRef.current += 1;
+    cleanup();
+    if (activePlayback?.owner === playbackOwnerRef.current) activePlayback = null;
+  }, [cleanup]);
 
   return (
     <div className="relative inline-flex">

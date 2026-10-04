@@ -732,3 +732,21 @@ async def test_transcribe_audio_facade(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert text == "transcribed"
     assert captured["json"]["input_audio"]["format"] == "webm"
+
+
+@pytest.mark.parametrize(
+    "formula",
+    ["$x*y*z$", "$$x*y*z$$", r"\(x*y*z\)", r"\[x*y*z\]", r"\begin{align}x*y*z\end{align}"],
+)
+def test_math_speak_off_preserves_products_while_cleaning_prose(formula):
+    assert (
+        strip_markdown_for_speech(f"**Multiply** {formula} and *compare*.", math_speak=False)
+        == "Multiply x*y*z and compare."
+    )
+
+
+def test_math_speak_off_keeps_tex_scripts_separate_from_prose_emphasis():
+    assert (
+        strip_markdown_for_speech(r"*Use* $x_i*y_j$ in file_name.", math_speak=False)
+        == "Use x_i*y_j in file_name."
+    )
