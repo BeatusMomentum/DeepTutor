@@ -157,6 +157,7 @@ PROVIDER_ALIASES = {
     "orca-router": "orcarouter",
     "cheaper_inference": "cheaperinference",
     "api route": "api_route",
+    "future_infra": "futureinfra",
 }
 
 
@@ -329,6 +330,16 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         is_gateway=True,
         detect_by_base_keyword="requesty",
         default_api_base="https://router.requesty.ai/v1",
+    ),
+    ProviderSpec(
+        name="futureinfra",
+        keywords=("futureinfra",),
+        env_key="FUTUREINFRA_API_KEY",
+        display_name="FutureInfra",
+        backend="openai_compat",
+        is_gateway=True,
+        detect_by_base_keyword="futureinfra",
+        default_api_base="https://futureinfra.ai/v1/ai",
     ),
     ProviderSpec(
         name="volcengine",
