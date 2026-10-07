@@ -26,6 +26,7 @@ describe("Inspectable source visual coverage", () => {
   it("displays unreadable or missing source states rather than permanent loading", async () => {
     vi.mocked(apiFetch).mockResolvedValueOnce(new Response("{}", { status: 409 })).mockResolvedValueOnce(new Response(JSON.stringify({ documents: [], assets: [], total_assets: 0 })));
     const view = render(<KbVisualCoverage kbName="kb" sourcePath="book.pdf" revision={0} />);
+    fireEvent.click(screen.getByText("Source visual coverage"));
     await screen.findByText("Could not read visual coverage. Open the original document to inspect the source.");
     view.rerender(<KbVisualCoverage kbName="kb" sourcePath="book.pdf" revision={1} />);
     await screen.findByText("Source document is unavailable. Refresh the file list.");

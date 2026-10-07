@@ -16,10 +16,12 @@ interface Coverage {
 export default function KbVisualCoverage({ kbName, sourcePath, revision }: { kbName: string; sourcePath: string; revision: number }) {
   const { t } = useTranslation();
   const [offset, setOffset] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   const key = `${kbName}\0${sourcePath}\0${revision}\0${offset}`;
   const [result, setResult] = useState<{ key: string; data?: Coverage; error?: boolean }>();
   const current = result?.key === key ? result : undefined;
   useEffect(() => {
+    if (!expanded) return;
     const controller = new AbortController();
     const query = new URLSearchParams({ source_path: sourcePath, offset: String(offset), limit: "20" });
     void apiFetch(`/api/knowledge-bases/${encodeURIComponent(kbName)}/visual-coverage?${query}`, { cache: "no-store", signal: controller.signal })
@@ -27,11 +29,11 @@ export default function KbVisualCoverage({ kbName, sourcePath, revision }: { kbN
       .then((data) => { if (!controller.signal.aborted) setResult({ key, data }); })
       .catch(() => { if (!controller.signal.aborted) setResult({ key, error: true }); });
     return () => controller.abort();
-  }, [kbName, sourcePath, offset, key]);
+  }, [kbName, sourcePath, offset, key, expanded]);
   const data = current?.data;
   const report = data?.documents[0];
-  return <details className="shrink-0 border-b border-[var(--border)] p-3 text-sm">
-    <summary className="cursor-pointer font-medium">{t("Source visual coverage")}</summary>
+  return <details open={expanded} className="shrink-0 border-b border-[var(--border)] p-3 text-sm">
+    <summary className="cursor-pointer font-medium" onClick={(event) => { event.preventDefault(); setExpanded((value) => !value); }}>{t("Source visual coverage")}</summary>
     <div className="mt-3 max-h-72 space-y-3 overflow-auto">
       <p>{t("Extracted figures do not prove complete visual coverage. Inspect the original page when labels, vectors or tables are missing.")}</p>
       {current?.error ? <p role="alert">{t("Could not read visual coverage. Open the original document to inspect the source.")}</p>
