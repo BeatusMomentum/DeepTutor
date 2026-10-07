@@ -1083,9 +1083,9 @@ def _is_legacy_lemonade_endpoint(api_base: str) -> bool:
     """
     try:
         endpoint = urlparse(api_base if "://" in api_base else f"http://{api_base}")
+        if endpoint.port != 13305:
+            return False
     except ValueError:
-        return False
-    if endpoint.port != 13305:
         return False
     if not _is_nonpublic_embedding_host(endpoint.hostname or ""):
         return False
@@ -1105,6 +1105,20 @@ def _resolve_embedding_provider(
         # Compatible embeddings. Recognize that endpoint before a Qwen3 model
         # name is mistaken for a remote embedding vendor (#1568, #1782).
         return "lemonade"
+
+    if _is_local_base_url(api_base) and hint in {None, "custom", "openai"}:
+        # Ollama also serves OpenAI-compatible embeddings on /v1/embeddings.
+        # Select the wire protocol by path, not by a port substring.
+        endpoint = urlparse(api_base if "://" in api_base else f"http://{api_base}")
+        path = endpoint.path.rstrip("/")
+        try:
+            native_root = not path and endpoint.port == 11434
+        except ValueError:
+            native_root = False
+        if path in {"/api/embed", "/api/embeddings"} or native_root:
+            return "ollama"
+        return "vllm"
+
     if hint and hint in EMBEDDING_PROVIDERS:
         return hint
 
@@ -1116,11 +1130,6 @@ def _resolve_embedding_provider(
     for provider_name, spec in EMBEDDING_PROVIDERS.items():
         if any(keyword in model_lower for keyword in spec.keywords):
             return provider_name
-
-    if _is_local_base_url(api_base):
-        if api_base and "11434" in api_base:
-            return "ollama"
-        return "vllm"
 
     for provider_name, spec in EMBEDDING_PROVIDERS.items():
         configured = provider_pool.get(provider_name)

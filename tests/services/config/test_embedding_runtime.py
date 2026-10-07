@@ -636,3 +636,51 @@ def test_embedding_provider_profile_key() -> None:
     resolved = resolve_embedding_runtime_config(catalog=catalog)
     assert resolved.provider_name == "cohere"
     assert resolved.api_key == "cohere-test-key"
+
+
+@pytest.mark.parametrize("binding", ["openai", "custom"])
+def test_generic_local_embedding_endpoint_accepts_empty_key(binding):
+    catalog = _build_catalog(
+        embedding_profile={
+            "id": "embedding-p",
+            "binding": binding,
+            "base_url": "http://localhost:1234/v1/embeddings",
+            "api_key": "",
+            "models": [{"id": "embedding-m", "model": "local-embedding"}],
+        }
+    )
+    config = get_embedding_config(catalog=catalog)
+    assert config.provider_mode == "local"
+    assert config.api_key == ""
+    assert config.effective_url == "http://localhost:1234/v1/embeddings"
+
+
+def test_invalid_lemonade_port_does_not_raise_during_detection():
+    from deeptutor.services.config.provider_runtime import _is_legacy_lemonade_endpoint
+
+    assert not _is_legacy_lemonade_endpoint("http://localhost:not-a-port/v1")
+
+
+@pytest.mark.parametrize(
+    "endpoint, expected",
+    [
+        ("http://localhost:11434/v1/embeddings", "vllm"),
+        ("http://localhost:1234/v1/embeddings?model=11434", "vllm"),
+        ("http://localhost:11434/api/embed", "ollama"),
+        ("http://localhost:9000/api/embed", "ollama"),
+    ],
+)
+def test_local_embedding_protocol_follows_endpoint_path(endpoint, expected):
+    catalog = _build_catalog(
+        embedding_profile={
+            "id": "embedding-p",
+            "binding": "openai",
+            "base_url": endpoint,
+            "api_key": "",
+            "models": [{"id": "embedding-m", "model": "nomic-embed-text"}],
+        }
+    )
+    config = get_embedding_config(catalog=catalog)
+    assert config.binding == expected
+    assert config.effective_url == endpoint
+    assert config.api_key == ""
