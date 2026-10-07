@@ -75,13 +75,6 @@ import {
   MaterialFailure,
   MaterialProcessing,
 } from "./WorkspaceChrome";
-import {
-  ConversationLinkDialog,
-  NotebookCaptureDialog,
-  OrganizedNotesDialog,
-  WorkspaceConfirmDialog,
-  WorkspaceValueDialog,
-} from "./dialogs";
 import { ReadingCompanion } from "./ReadingCompanion";
 import { PageToolButtons, ReadAloudButton } from "./ReadAloudButton";
 import {
@@ -91,6 +84,28 @@ import {
 import { WorkspaceMenu, useWorkspaceMenuHost } from "./WorkspaceMenu";
 import { useReadingWorkspace } from "./useReadingWorkspace";
 import { useReadingLearningMode } from "./useLearningMode";
+
+// Dialogs are only needed after an explicit workspace action.
+const ConversationLinkDialog = dynamic(
+  () => import("./dialogs").then((module) => module.ConversationLinkDialog),
+  { ssr: false },
+);
+const NotebookCaptureDialog = dynamic(
+  () => import("./dialogs").then((module) => module.NotebookCaptureDialog),
+  { ssr: false },
+);
+const OrganizedNotesDialog = dynamic(
+  () => import("./dialogs").then((module) => module.OrganizedNotesDialog),
+  { ssr: false },
+);
+const WorkspaceConfirmDialog = dynamic(
+  () => import("./dialogs").then((module) => module.WorkspaceConfirmDialog),
+  { ssr: false },
+);
+const WorkspaceValueDialog = dynamic(
+  () => import("./dialogs").then((module) => module.WorkspaceValueDialog),
+  { ssr: false },
+);
 
 const MediaReadingStage = dynamic(
   () => import("./MediaReadingStage").then((module) => module.MediaReadingStage),
