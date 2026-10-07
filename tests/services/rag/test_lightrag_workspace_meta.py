@@ -34,13 +34,20 @@ def test_corrupt_meta_json_warns_and_falls_back(
 
 
 def test_unreadable_meta_json_warns_and_falls_back(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     meta = tmp_path / "meta.json"
     meta.write_text(
         json.dumps({"provider": "lightrag", "workspace": "deeptutor_abc"}), encoding="utf-8"
     )
-    meta.chmod(0o000)
+    read_text = Path.read_text
+
+    def denied_meta(path: Path, *args, **kwargs):
+        if path == meta:
+            raise PermissionError("cannot read meta.json")
+        return read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", denied_meta)
     with caplog.at_level(logging.WARNING, logger=_ENGINE_LOGGER):
         name = engine.workspace_for(tmp_path)
     assert name == _hash_workspace(tmp_path)
