@@ -305,6 +305,9 @@ async def test_active_mastery_retrieves_verified_pixels_without_persisting_them(
     ]
     if evidence == "available":
         assert len(images) == 1
+        assert context.extension("source_visual_evidence")["image_hashes"] == [
+            candidate.record["image_sha256"]
+        ]
         assert (
             base64.b64decode(images[0]["image_url"]["url"].split(",", 1)[1]) == image.read_bytes()
         )
@@ -318,6 +321,7 @@ async def test_active_mastery_retrieves_verified_pixels_without_persisting_them(
         assert candidate.record["asset_id"] in str(request[image_position])
     else:
         assert images == []
+        assert context.extension("source_visual_evidence")["image_hashes"] == []
         tool_text = next(msg["content"] for msg in request if msg.get("tool_call_id") == "figure")
         assert (
             "cannot inspect source image pixels"
@@ -3824,4 +3828,5 @@ async def test_image_fallback_strips_all_canonical_copies_after_wire_deduplicati
     assert not has_image_parts(attempted[1])
     assert not has_image_parts(attempted[2])
     assert not has_image_parts(messages)
+    assert context.extension("source_visual_evidence")["image_hashes"] == []
     assert "Repeated image" not in str(messages)

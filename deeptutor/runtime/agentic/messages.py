@@ -5,6 +5,42 @@ from __future__ import annotations
 from typing import Any
 
 
+def image_content_hashes(messages: list[dict]) -> list[str]:
+    """Hashes of bounded image bytes on the accepted provider wire (#1611)."""
+    from base64 import b64decode
+    from hashlib import sha256
+
+    hashes = set()
+    for message in messages:
+        content = message.get("content")
+        for part in content if isinstance(content, list) else []:
+            if not isinstance(part, dict):
+                continue
+            value = part.get("image_url")
+            url = value.get("url") if isinstance(value, dict) else value
+            source = part.get("source")
+            if (
+                part.get("type") == "image"
+                and isinstance(source, dict)
+                and source.get("type") == "base64"
+            ):
+                url = f"data:{source.get('media_type', '')};base64,{source.get('data', '')}"
+            if (
+                not isinstance(url, str)
+                or not url.startswith("data:image/")
+                or ";base64," not in url
+            ):
+                continue
+            encoded = url.split(";base64,", 1)[1]
+            if len(encoded) > 7 * 1024 * 1024:
+                continue
+            try:
+                hashes.add(sha256(b64decode(encoded, validate=True)).hexdigest())
+            except ValueError:
+                continue
+    return sorted(hashes)
+
+
 def assistant_message_with_tool_calls(
     content: str,
     tool_calls: list[dict[str, Any]],

@@ -5472,5 +5472,20 @@
   "visualCoverage.asset_read_failed": "Abbildung konnte nicht gelesen werden; prüfe die Originalseite",
   "visualCoverage.table_structure_requires_source_verification": "Tabellenstruktur muss anhand der Originalseite geprüft werden",
   "visualCoverage.referenced_image_not_retained": "Referenzierte Abbildung wurde nicht gespeichert; prüfe die Quellseite",
-  "visualCoverage.extraction_coverage_unknown": "Extraktionsabdeckung ist noch ungeprüft"
+  "visualCoverage.extraction_coverage_unknown": "Extraktionsabdeckung ist noch ungeprüft",
+  "Guided visual practice — this does not demonstrate independent mastery.": "Angeleitete visuelle Übung – kein Nachweis eigenständiger Beherrschung.",
+  "Visual practice with the original source.": "Visuelle Übung mit der Originalquelle.",
+  "The reference key is uncertain. This practice will remain ungraded.": "Der Lösungsschlüssel ist unsicher. Diese Übung bleibt unbewertet.",
+  "Original source evidence": "Originaler Quellenbeleg",
+  "Ungraded — mastery unchanged": "Unbewertet – Lernstand unverändert",
+  "Review or challenge this assessment": "Bewertung prüfen oder anfechten",
+  "The source image is unavailable. Open the source or ask your tutor to inspect its current version.": "Die Quellabbildung ist nicht verfügbar. Öffne die Quelle oder bitte deinen Tutor, die aktuelle Version zu prüfen.",
+  "Independent visual evidence": "Eigenständiger visueller Nachweis",
+  "Explained": "Erklärt",
+  "Visual practice": "Visuelle Übung",
+  "Assisted": "Mit Hilfe",
+  "Independent visual evidence is still required for this objective.": "Für dieses Lernziel ist noch ein eigenständiger visueller Nachweis erforderlich.",
+  "Assisted practice is recorded separately from independent mastery.": "Angeleitete Übung wird getrennt von eigenständiger Beherrschung erfasst.",
+  "Please review assessment {{questionId}} against its original source evidence. If it is unsupported, invalidate it and recompute learning state. Do not grant mastery merely because I challenged it.": "Bitte prüfe Bewertung {{questionId}} anhand der Originalquelle. Wenn sie unbelegt ist, annulliere sie und berechne den Lernstand neu. Vergib keinen Beherrschungsnachweis allein wegen meines Einspruchs.",
+  "Current model input has no verified source pixels. Retrieve the image again with a vision-capable model before grading.": "In der aktuellen Modelleingabe sind keine verifizierten Quellbilder enthalten. Lade das Bild vor der Bewertung mit einem visuellen Modell erneut."
 }

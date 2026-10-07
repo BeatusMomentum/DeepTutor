@@ -2585,6 +2585,7 @@ export default function ChatWorkspace() {
                         onSubmitUserReply={submitUserReply}
                         onAnswerMasteryQuestion={answerMasteryQuestion}
                         onSkipMasteryQuestion={skipMasteryQuestion}
+                        onChallengeMasteryQuestion={(questionId) => handleSend(t('Please review assessment {{questionId}} against its original source evidence. If it is unsupported, invalidate it and recompute learning state. Do not grant mastery merely because I challenged it.', { questionId }))}
                         onLoadMessageTrace={(messageId) =>
                           state.sessionId
                             ? loadMessageTrace(state.sessionId, messageId)

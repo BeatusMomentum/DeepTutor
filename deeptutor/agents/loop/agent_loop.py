@@ -49,6 +49,7 @@ from deeptutor.core.trace import build_trace_metadata, merge_trace_metadata, new
 from deeptutor.runtime.agentic.messages import (
     assistant_message_with_tool_calls,
     extend_transient_model_messages,
+    image_content_hashes,
     with_transient_model_messages,
 )
 from deeptutor.runtime.agentic.think_stream import InlineThinkFilter
@@ -298,6 +299,7 @@ class AgentLoop:
         # #1611: retrieved pixels belong to this turn's requests, never to
         # durable history. Both loop engines share the same ordering/budget.
         self._transient_model_messages: list[dict[str, Any]] = []
+        context.extension("source_visual_evidence")["image_hashes"] = []
         self._request_fingerprint = (context.runtime.previous_model_turn or {}).get(
             "request_fingerprint"
         )
@@ -1265,6 +1267,11 @@ class AgentLoop:
                 response_stream = await asyncio.wait_for(
                     self._create_response_stream(kwargs, trace_meta, stage),
                     _STREAM_IDLE_TIMEOUT_SECONDS,
+                )
+                # A declared vision capability is not evidence of delivered
+                # pixels when the provider actually falls back to text.
+                self.context.extension("source_visual_evidence")["image_hashes"] = (
+                    image_content_hashes(kwargs["messages"])
                 )
                 # Retain an actual provider fallback for later rounds. The
                 # request-only image deduplication must never overwrite history.

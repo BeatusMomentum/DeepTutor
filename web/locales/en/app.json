@@ -5472,5 +5472,20 @@
   "visualCoverage.asset_read_failed": "Image read failed; inspect the original page",
   "visualCoverage.table_structure_requires_source_verification": "Verify table structure against the original page",
   "visualCoverage.referenced_image_not_retained": "Referenced image not retained; inspect its source page",
-  "visualCoverage.extraction_coverage_unknown": "Extraction coverage has not been verified"
+  "visualCoverage.extraction_coverage_unknown": "Extraction coverage has not been verified",
+  "Guided visual practice — this does not demonstrate independent mastery.": "Guided visual practice — this does not demonstrate independent mastery.",
+  "Visual practice with the original source.": "Visual practice with the original source.",
+  "The reference key is uncertain. This practice will remain ungraded.": "The reference key is uncertain. This practice will remain ungraded.",
+  "Original source evidence": "Original source evidence",
+  "Ungraded — mastery unchanged": "Ungraded — mastery unchanged",
+  "Review or challenge this assessment": "Review or challenge this assessment",
+  "The source image is unavailable. Open the source or ask your tutor to inspect its current version.": "The source image is unavailable. Open the source or ask your tutor to inspect its current version.",
+  "Independent visual evidence": "Independent visual evidence",
+  "Explained": "Explained",
+  "Visual practice": "Visual practice",
+  "Assisted": "Assisted",
+  "Independent visual evidence is still required for this objective.": "Independent visual evidence is still required for this objective.",
+  "Assisted practice is recorded separately from independent mastery.": "Assisted practice is recorded separately from independent mastery.",
+  "Please review assessment {{questionId}} against its original source evidence. If it is unsupported, invalidate it and recompute learning state. Do not grant mastery merely because I challenged it.": "Please review assessment {{questionId}} against its original source evidence. If it is unsupported, invalidate it and recompute learning state. Do not grant mastery merely because I challenged it.",
+  "Current model input has no verified source pixels. Retrieve the image again with a vision-capable model before grading.": "Current model input has no verified source pixels. Retrieve the image again with a vision-capable model before grading."
 }

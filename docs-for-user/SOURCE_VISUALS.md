@@ -79,6 +79,61 @@ unavailable pixels and changed-source abstentions are checked independently of
 language-model fluency.
 
 
+## Source-grounded practice and learning evidence
+
+In Guided Learning, request explanation, practice or review explicitly. An
+explanation-only turn need not pose a question; `mastery_note_explained` records
+what was taught without granting mastery. Deferring an objective preserves it
+as unfinished. For goals that require visual understanding, outline objectives
+can declare `required_visual_tasks`: `identification`, `relationship`,
+`table_graph` or `comparison`. Generic text scores cannot satisfy those visual
+requirements. The objective view shows the remaining independent evidence.
+
+Ask for practice on an exact original figure or page from an attached KB. The
+tutor retrieves its pixels, then poses a `mastery_quiz` with a `visual` context.
+The question card displays the original evidence and document/page links.
+Numbered-label identification, source-backed relationship questions, table or
+graph interpretation and bounded two-source comparisons are supported. No
+automatic segmentation, invented label masks or generated replacement diagram
+is used. A source image that fails to load disables submission while still
+allowing the learner to skip or ask for help.
+
+The reference key uses canonical source terminology and a supporting caption,
+explanation or page quote. Explicitly verified equivalent terms, including
+other languages, can answer the same question. Choice questions distinguish
+supported wrong answers; unknown free-text wording asks for clarification
+instead of fuzzy keyword grading. Uncertain/conflicting keys, inaccessible or
+changed sources, and missing model-input pixels remain ungraded and create no
+negative mastery or retention evidence. A figure URL or a declared vision
+capability is insufficient: the active loop checks matching image bytes in the
+accepted provider request, including actual text-only fallback.
+
+Visible/unknown answer cues are guided practice, with assistance retained and
+weaker review evidence. They do not demonstrate independent mastery. A full
+page that exposes the reference answer stays guided; a verified original-page
+region can support independent interpretation when the answer cue is outside
+the view, with the full source retained for reference verification. Recent
+assistance, repeated answer-key exposure and help given after a question also
+remain distinguishable through the existing retention session boundary.
+
+Use **Review or challenge this assessment** to request source review. Existing
+`mastery_repair_question` invalidates a faulty assessment and recomputes its
+mastery/error/review effects. Correcting a visual key also requires source
+support; a challenge alone never grants mastery. Manual learner overrides retain
+their separate provenance. Source/figure identity, objective, task, cues/help,
+answer and attempt identity survive restart. A transport retry records one
+attempt; a new question records new evidence. Outline replacement preserves
+trusted objective identity rather than transferring an achievement by title or
+position. Unassessed, explained, assisted and independently demonstrated work
+remain distinct.
+
+Regression workflows use independently specified synthetic numbered figures,
+relationships and table values, including equivalent-language answers, wrong
+choices, ungraded ambiguity, repair, deferral, repeat submissions, outline
+replacement, source changes and restart. This supported set provides explicit
+recovery for uncertainty rather than promising unrestricted grading of every
+image or arbitrary prose answer.
+
 ## Token estimates for image requests
 
 When the provider returns usage, DeepTutor uses those reported counters. When

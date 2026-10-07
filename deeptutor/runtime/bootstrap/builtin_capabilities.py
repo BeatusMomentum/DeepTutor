@@ -166,6 +166,7 @@ BUILTIN_CAPABILITY_SPECS: dict[str, BuiltinCapabilitySpec] = {
             tools_used=[
                 "mastery_status",
                 "mastery_quiz",
+                "mastery_note_explained",
                 "mastery_grade",
                 "mastery_skip_question",
                 "mastery_repair_question",

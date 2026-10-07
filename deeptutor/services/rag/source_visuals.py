@@ -128,6 +128,7 @@ def page_image(
                     "Page image exceeds the model byte budget. Select a smaller region."
                 )
             text = sheet.get_text("text", clip=clip)[:6000]
+            page_context = sheet.get_text("text")[:6000]
     except ValueError:
         raise
     except Exception as exc:
@@ -143,6 +144,7 @@ def page_image(
         "region": region,
         "mime_type": mime,
         "text": text,
+        "page_context": page_context,
         "render_scale": scale,
         "kind": "source_page",
         "source_locator": f"page:{page}",

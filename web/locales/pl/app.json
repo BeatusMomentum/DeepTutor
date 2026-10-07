@@ -5488,5 +5488,20 @@
   "visualCoverage.asset_read_failed": "Nie udało się odczytać obrazu; sprawdź oryginalną stronę",
   "visualCoverage.table_structure_requires_source_verification": "Struktura tabeli wymaga sprawdzenia na oryginalnej stronie",
   "visualCoverage.referenced_image_not_retained": "Nie zachowano wskazanego obrazu; sprawdź stronę źródłową",
-  "visualCoverage.extraction_coverage_unknown": "Pokrycie wyodrębniania nie zostało zweryfikowane"
+  "visualCoverage.extraction_coverage_unknown": "Pokrycie wyodrębniania nie zostało zweryfikowane",
+  "Guided visual practice — this does not demonstrate independent mastery.": "Ćwiczenie wizualne ze wsparciem — nie dowodzi samodzielnego opanowania.",
+  "Visual practice with the original source.": "Ćwiczenie wizualne z oryginalnym źródłem.",
+  "The reference key is uncertain. This practice will remain ungraded.": "Klucz odpowiedzi jest niepewny. Ćwiczenie pozostanie bez oceny.",
+  "Original source evidence": "Oryginalny materiał źródłowy",
+  "Ungraded — mastery unchanged": "Bez oceny — poziom opanowania bez zmian",
+  "Review or challenge this assessment": "Sprawdź lub zakwestionuj tę ocenę",
+  "The source image is unavailable. Open the source or ask your tutor to inspect its current version.": "Obraz źródłowy jest niedostępny. Otwórz źródło lub poproś tutora o sprawdzenie bieżącej wersji.",
+  "Independent visual evidence": "Samodzielny dowód rozumienia obrazu",
+  "Explained": "Wyjaśnione",
+  "Visual practice": "Ćwiczenie wizualne",
+  "Assisted": "Ze wsparciem",
+  "Independent visual evidence is still required for this objective.": "Ten cel nadal wymaga samodzielnego dowodu rozumienia obrazu.",
+  "Assisted practice is recorded separately from independent mastery.": "Ćwiczenia ze wsparciem są zapisywane oddzielnie od samodzielnego opanowania.",
+  "Please review assessment {{questionId}} against its original source evidence. If it is unsupported, invalidate it and recompute learning state. Do not grant mastery merely because I challenged it.": "Sprawdź ocenę {{questionId}} na podstawie oryginalnego źródła. Jeśli jest nieuzasadniona, unieważnij ją i przelicz stan nauki. Samo zakwestionowanie nie dowodzi opanowania.",
+  "Current model input has no verified source pixels. Retrieve the image again with a vision-capable model before grading.": "Bieżące dane wejściowe modelu nie zawierają zweryfikowanego obrazu źródłowego. Przed oceną pobierz go ponownie modelem obsługującym obrazy."
 }
