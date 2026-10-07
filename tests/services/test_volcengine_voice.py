@@ -235,10 +235,7 @@ def test_qwen_audio_defaults_and_hints_match_the_selected_model():
     assert options["voices"] == []
     assert options["docs_url"].endswith("qwen-audio-tts-voice-list")
     assert "Beijing" in options["configuration_note"]
-    assert (
-        resolve_tts_runtime_config(catalog("dashscope", "qwen-audio-3.0-tts-flash")).voice
-        == ""
-    )
+    assert resolve_tts_runtime_config(catalog("dashscope", "qwen-audio-3.0-tts-flash")).voice == ""
     # Future Qwen-Audio models must not silently acquire Qwen3's Cherry voice.
     assert resolve_tts_runtime_config(catalog("dashscope", "qwen-audio-9.0-tts-plus")).voice == ""
 
