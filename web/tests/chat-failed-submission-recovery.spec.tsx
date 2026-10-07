@@ -144,6 +144,7 @@ function Harness() {
       <button onClick={() => void loadSession("new-session")}>Load new</button>
       <button onClick={() => sendMessage("Hello offline")}>Send</button>
       <button onClick={() => sendMessage("Second offline")}>Send another</button>
+      <button onClick={() => sendMessage("", [{ type: "image", filename: "figure.png", base64: "YWJj" }])}>Send image only</button>
       <button onClick={() => void resendLastMessage()}>Resend</button>
       <button onClick={cancelStreamingTurn}>Stop</button>
       <button onClick={() => {
@@ -231,6 +232,20 @@ beforeEach(() => {
 });
 
 afterEach(() => vi.restoreAllMocks());
+
+it("tracks attachment-only submissions with a stable identity for resend", async () => {
+  fixture.connected = true;
+  render(<ChatStateAdapterProvider><Harness /></ChatStateAdapterProvider>);
+  fireEvent.click(screen.getByRole("button", { name: "Send image only" }));
+  await act(async () => {});
+  const sent = fixture.sent.find((message) => message.type === "start_turn");
+  expect(sent?.client_submission_id).toBeTruthy();
+  const draft = readFailedSubmissions("draft:general");
+  expect(draft).toHaveLength(1);
+  expect(draft[0].submissionId).toBe(sent?.client_submission_id);
+  const snapshot = draft[0].requestSnapshot as { attachments: Array<{ filename: string }> };
+  expect(snapshot.attachments[0].filename).toBe("figure.png");
+});
 
 it("restores a persisted worker loss and retries the same mastery answer snapshot", async () => {
   fixture.session = {

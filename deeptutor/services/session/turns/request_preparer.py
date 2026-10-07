@@ -11,6 +11,12 @@ import uuid
 from deeptutor.core.stream import StreamEvent, StreamEventType
 from deeptutor.core.turn_request import TurnRequest
 from deeptutor.runtime.capability_routing import route_explicit_quiz_request
+from deeptutor.services.session.protocol import (
+    SUBMISSION_ASSISTANT_FIELD,
+    SUBMISSION_PREVIOUS_TURN_FIELD,
+    SUBMISSION_REPLAY_FIELD,
+    SUBMISSION_USER_FIELD,
+)
 from deeptutor.services.session.workspace_preferences import (
     WORKSPACE_MODE_MASTERY,
     WORKSPACE_MODE_READING,
@@ -682,8 +688,18 @@ class TurnRequestPreparer:
         if not payload.get("preserve_session_preferences"):
             await self.store.update_session_preferences(session["id"], preference_update)
         try:
+            submission_kwargs = {}
+            if (
+                payload.get("client_submission_id")
+                and payload.get("persist_user_message", True)
+                and not payload.get("regenerate")
+                and callable(getattr(self.store, "reserve_submission", None))
+            ):
+                submission_kwargs["submission_id"] = payload["client_submission_id"]
             if lease is None:
-                turn = await self.store.create_turn(session["id"], capability=capability)
+                turn = await self.store.create_turn(
+                    session["id"], capability=capability, **submission_kwargs
+                )
             else:
                 turn = await self.store.begin_turn(
                     session["id"],
@@ -691,12 +707,30 @@ class TurnRequestPreparer:
                     turn_id=lease.turn_id,
                     owner_id=lease.owner_id,
                     fencing_token=lease.fencing_token,
+                    **submission_kwargs,
                 )
         except Exception:
             if lease is not None and self.coordinator is not None:
                 with contextlib.suppress(Exception):
                     await self.coordinator.release_turn(lease)
             raise
+        if turn.pop(SUBMISSION_REPLAY_FIELD, False):
+            if lease is not None and self.coordinator is not None:
+                await self.coordinator.release_turn(lease)
+            return session, turn
+        user_message_id = turn.pop(SUBMISSION_USER_FIELD, None)
+        prior_assistant_id = turn.pop(SUBMISSION_ASSISTANT_FIELD, None)
+        prior_turn_id = turn.pop(SUBMISSION_PREVIOUS_TURN_FIELD, None)
+        if user_message_id is not None:
+            payload = {
+                **payload,
+                "persist_user_message": False,
+                "regenerate": True,
+                "regenerated_from_message_id": user_message_id,
+                "superseded_turn_id": prior_turn_id,
+            }
+            if replace_assistant_message_id is None:
+                replace_assistant_message_id = prior_assistant_id
         execution = _TurnExecution(
             turn_id=turn["id"],
             session_id=session["id"],

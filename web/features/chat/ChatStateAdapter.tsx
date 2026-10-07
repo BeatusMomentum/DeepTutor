@@ -2949,7 +2949,7 @@ export function ChatStateAdapterProvider({
         options?.displayUserMessage !== false &&
         !options?.masteryAnswer &&
         !options?.masterySkip &&
-        content.trim() !== "";
+        (content.trim() !== "" || Boolean(effectiveAttachments?.length));
       const submissionId = options?.retrySubmissionId ??
         (trackNewSubmission ? randomUuid() : undefined);
       const persistSubmission = Boolean(submissionId) &&

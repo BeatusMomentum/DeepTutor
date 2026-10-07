@@ -1169,10 +1169,13 @@ class TurnExecutor:
             # Attach the persisted row ids so the frontend can reconcile its
             # optimistic (negative) message ids with a targeted in-place swap
             # instead of refetching and re-rendering the whole session.
+            accepted_user_message_id = new_user_message_id
+            if accepted_user_message_id is None and is_regenerate:
+                accepted_user_message_id = payload.get("regenerated_from_message_id")
             persisted_ids = {
                 key: value
                 for key, value in (
-                    ("user_message_id", new_user_message_id),
+                    ("user_message_id", accepted_user_message_id),
                     ("assistant_message_id", assistant_message_id),
                 )
                 if value
