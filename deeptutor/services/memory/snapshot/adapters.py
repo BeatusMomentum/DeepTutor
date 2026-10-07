@@ -21,9 +21,12 @@ from pathlib import Path
 import sqlite3
 from typing import Any
 
+from deeptutor.multi_user.paths import get_account_path_service
 from deeptutor.services.memory.paths import Surface
 from deeptutor.services.memory.snapshot.entity import Entity, EntityStamp
-from deeptutor.services.path_service import PathService, get_path_service
+from deeptutor.services.path_service import get_path_service
+from deeptutor.services.workspace.context import WorkspacePathService, WorkspaceScope
+from deeptutor.services.workspace.models import WorkspaceError
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +79,8 @@ def _iter_chat_dbs() -> list[tuple[str, Path]]:
     redirected store is skipped rather than raised, so one broken binding
     cannot blank an account-wide scan.
     """
-    pairs: list[tuple[str, Path]] = [("", get_path_service().get_chat_history_db())]
+    account = get_account_path_service()
+    pairs: list[tuple[str, Path]] = [("", account.get_chat_history_db())]
     try:
         from deeptutor.services.workspace import get_content_workspace_service
 
@@ -87,20 +91,18 @@ def _iter_chat_dbs() -> list[tuple[str, Path]]:
         )
         return pairs
     for binding in bindings:
-        private_root = (binding.root / ".deeptutor").resolve()
-        data_root = private_root / "data"
-        if private_root.is_symlink() or data_root.is_symlink():
+        try:
+            paths = WorkspacePathService(
+                account,
+                WorkspaceScope(binding.workspace_id, account.workspace_root, binding.root),
+            )
+        except WorkspaceError:
             logger.warning(
                 "workspace %s skipped from memory aggregation: redirected data store",
                 binding.workspace_id,
             )
             continue
-        pairs.append(
-            (
-                f"ws:{binding.workspace_id}:",
-                PathService(workspace_root=data_root).get_chat_history_db(),
-            )
-        )
+        pairs.append((f"ws:{binding.workspace_id}:", paths.get_chat_history_db()))
     return pairs
 
 
