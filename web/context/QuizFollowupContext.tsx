@@ -260,6 +260,30 @@ export function QuizFollowupProvider({ children }: ProviderProps) {
     [],
   );
 
+  const persistFollowupSessionId = useCallback(
+    (key: string, entryId: number, sessionId: string) => {
+      const write = () =>
+        updateNotebookEntry(entryId, { followup_session_id: sessionId });
+      void (async () => {
+        try {
+          await write();
+        } catch {
+          try {
+            await write();
+          } catch {
+            updateThread(key, (prev) => ({
+              ...prev,
+              error:
+                prev.error ||
+                "Failed to link this follow-up chat to its notebook entry.",
+            }));
+          }
+        }
+      })();
+    },
+    [updateThread],
+  );
+
   const handleThreadEvent = useCallback(
     (key: string, event: StreamEvent) => {
       if (event.type === "session") {
@@ -279,9 +303,7 @@ export function QuizFollowupProvider({ children }: ProviderProps) {
         if (runner) runner.questionKey = nextSessionId;
         const entryId = entryIdsRef.current.get(key);
         if (entryId) {
-          void updateNotebookEntry(entryId, {
-            followup_session_id: nextSessionId,
-          }).catch(() => {});
+          persistFollowupSessionId(key, entryId, nextSessionId);
         }
         return;
       }
@@ -348,7 +370,7 @@ export function QuizFollowupProvider({ children }: ProviderProps) {
         return next;
       });
     },
-    [updateThread],
+    [persistFollowupSessionId, updateThread],
   );
 
   const ensureRunner = useCallback(
