@@ -435,7 +435,7 @@ async def test_codebuddy_interrupt_failure_after_tool_calls_logs_warning(
 
         async def interrupt(self):
             self.interrupt_calls += 1
-            raise RuntimeError("interrupt pipe closed")
+            raise RuntimeError("Authorization: Bearer fake-token; prompt=private-user-body")
 
         async def disconnect(self):
             pass
@@ -484,6 +484,9 @@ async def test_codebuddy_interrupt_failure_after_tool_calls_logs_warning(
     assert any(
         "interrupt" in r.getMessage().lower() and "RuntimeError" in r.getMessage() for r in warnings
     ), [r.getMessage() for r in warnings]
+    assert "fake-token" not in caplog.text
+    assert "private-user-body" not in caplog.text
+    assert all(record.exc_info is None for record in warnings)
     session = provider._sessions["chat-interrupt-fail"]
     assert session.client.interrupt_calls == 1
     await provider.aclose()
@@ -554,3 +557,20 @@ def test_codebuddy_ignores_deeptutor_no_key_placeholder() -> None:
 
 async def _append_async(items: list[str], text: str) -> None:
     items.append(text)
+
+
+@pytest.mark.asyncio
+async def test_interrupted_drain_logs_error_type_without_exception_body(caplog):
+    from deeptutor.services.llm.provider_core.codebuddy_provider import _drain_interrupted_response
+
+    async def broken_stream():
+        yield {"type": "intermediate"}
+        raise RuntimeError("Authorization: Bearer fake-token; prompt=private-user-body")
+
+    with caplog.at_level(logging.WARNING):
+        await _drain_interrupted_response(broken_stream())
+
+    assert "drain failed (RuntimeError)" in caplog.text
+    assert "fake-token" not in caplog.text
+    assert "private-user-body" not in caplog.text
+    assert all(record.exc_info is None for record in caplog.records)

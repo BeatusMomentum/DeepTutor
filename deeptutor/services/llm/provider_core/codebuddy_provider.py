@@ -33,14 +33,6 @@ _MCP_TOOL_PREFIX = f"mcp__{_MCP_SERVER_NAME}__"
 logger = logging.getLogger(__name__)
 
 
-def _short_exception(exc: BaseException) -> str:
-    """Type plus a short reason — never prompt bodies or credentials."""
-    reason = str(exc).strip()
-    if len(reason) > 200:
-        reason = reason[:200] + "..."
-    return reason or "<no message>"
-
-
 @dataclass
 class _SessionTurn:
     prompt: str
@@ -562,10 +554,9 @@ async def _consume_messages(
                     await interrupt()
                 except Exception as exc:
                     logger.warning(
-                        "CodeBuddy interrupt after tool calls failed (%s: %s); "
+                        "CodeBuddy interrupt after tool calls failed (%s); "
                         "background generation may keep running",
                         type(exc).__name__,
-                        _short_exception(exc),
                     )
                 else:
                     await _drain_interrupted_response(messages)
@@ -590,10 +581,9 @@ async def _drain_interrupted_response(messages: Any) -> None:
                 return
     except Exception as exc:
         logger.warning(
-            "CodeBuddy interrupted response drain failed (%s: %s); "
+            "CodeBuddy interrupted response drain failed (%s); "
             "stale SDK messages may surface in the next turn",
             type(exc).__name__,
-            _short_exception(exc),
         )
 
 
