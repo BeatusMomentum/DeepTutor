@@ -20,7 +20,6 @@ from deeptutor.services.session.protocol import (
 from deeptutor.services.session.workspace_preferences import (
     WORKSPACE_MODE_MASTERY,
     WORKSPACE_MODE_READING,
-    WORKSPACE_MODE_WATCHING,
 )
 from deeptutor.services.workspace.activity import workspace_writer
 
@@ -234,6 +233,65 @@ class TurnRequestPreparer:
             )
             payload["_content_workspace_id"] = binding.workspace_id
 
+        legacy_watching = (
+            payload.get("workspace_mode") == "immersive_watching"
+            or payload.get("capability") == "immersive_watching"
+            or payload.get("session_kind") == "immersive_watching"
+            or preferences.get("workspace_mode") == "immersive_watching"
+            or preferences.get("capability") == "immersive_watching"
+            or preferences.get("session_kind") == "immersive_watching"
+        )
+        if legacy_watching:
+            timed_media_id = _timed_media_id(
+                payload.get("timed_media_id") or preferences.get("timed_media_id")
+            )
+            if not timed_media_id:
+                raise RuntimeError("The legacy Watching video is unavailable.")
+            try:
+                from deeptutor.video_learning.reading_migration import WatchingToReadingMigration
+
+                migrated = await WatchingToReadingMigration().migrate(
+                    timed_media_id,
+                    session_id=str(session.get("id") or ""),
+                    session_title=str(session.get("title") or "Imported video conversation"),
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "The legacy Watching video could not be opened in Reading."
+                ) from exc
+            preferences = {
+                **preferences,
+                "capability": "chat",
+                "workspace_mode": WORKSPACE_MODE_READING,
+                "session_kind": "immersive_reading",
+                "reading_workspace_id": migrated.reading_workspace_id,
+                "reading_material_id": migrated.reading_material_id,
+                "timed_media_id": timed_media_id,
+            }
+            legacy_viewport = (
+                payload.get("timed_media_viewport") or preferences.get("timed_media_viewport") or {}
+            )
+            preferences.pop("timed_media_viewport", None)
+            session["preferences"] = preferences
+            await self.store.update_session_preferences(str(session.get("id")), preferences)
+            payload = {
+                **payload,
+                "capability": "chat",
+                "workspace_mode": WORKSPACE_MODE_READING,
+                "reading_workspace_id": migrated.reading_workspace_id,
+                "reading_material_id": migrated.reading_material_id,
+                "timed_media_id": timed_media_id,
+            }
+            # TimedMedia remains a legacy cache pointer on the session, but
+            # execution is wholly Reading-owned from here onward.
+            if (
+                isinstance(legacy_viewport, dict)
+                and legacy_viewport.get("time_seconds") is not None
+            ):
+                payload["reading_viewport"] = {"time_seconds": legacy_viewport["time_seconds"]}
+            payload.pop("timed_media_id", None)
+            payload.pop("timed_media_viewport", None)
+
         course_id_explicit = "course_id" in payload
         requested_course_id = str(
             (payload.get("course_id") if course_id_explicit else preferences.get("course_id")) or ""
@@ -286,16 +344,8 @@ class TurnRequestPreparer:
         except PermissionError as exc:
             raise RuntimeError(str(exc)) from exc
 
-        if workspace_mode == WORKSPACE_MODE_WATCHING:
-            from deeptutor.video_learning import get_timed_media_store
-
-            media_id = _timed_media_id(payload.get("timed_media_id"))
-            if media_id:
-                # Resolve only in the authenticated owner's store before saving the binding.
-                get_timed_media_store().get(media_id)
-        else:
-            payload.pop("timed_media_id", None)
-            payload.pop("timed_media_viewport", None)
+        payload.pop("timed_media_id", None)
+        payload.pop("timed_media_viewport", None)
         try:
             from deeptutor.runtime.request_contracts import validate_capability_config
 
@@ -591,8 +641,6 @@ class TurnRequestPreparer:
         # non-empty legacy capability is persisted as part of migration.
         if workspace_mode_explicit or workspace_mode:
             preference_update["workspace_mode"] = workspace_mode
-        if workspace_mode == "immersive_watching":
-            preference_update["timed_media_id"] = _timed_media_id(payload.get("timed_media_id"))
         if course_id_explicit:
             preference_update["course_id"] = requested_course_id
 

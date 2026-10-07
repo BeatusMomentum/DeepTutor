@@ -11,9 +11,6 @@ import {
   setReadingWorkspace,
 } from "@/lib/reading-turn-state";
 import {
-  resetWatchingTurnState, setWatchingMaterial, setWatchingViewport,
-} from "@/lib/watching-turn-state";
-import {
   clearFailedSubmission,
   moveFailedSubmissions,
   readFailedSubmission,
@@ -163,11 +160,6 @@ function Harness() {
         setReadingMaterial("deadbeef", 2);
         setReadingViewport({ locator: 7, selection: "old passage", timeSeconds: 12 });
       }}>Prepare reading</button>
-      <button onClick={() => {
-        configureSession({ capability: "immersive_watching", workspaceMode: "immersive_watching" });
-        setWatchingMaterial("video-a");
-        setWatchingViewport(42);
-      }}>Prepare watching</button>
       <div data-testid="submissionFailed">
         {String(state.submissionFailed)}
       </div>
@@ -224,7 +216,6 @@ beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
   resetReadingTurnState();
-  resetWatchingTurnState();
   fixture.connected = false;
   fixture.sent = [];
   fixture.emit = undefined;
@@ -614,25 +605,6 @@ it("retries the original reading viewport after the live document changes", asyn
   }
 });
 
-it("retries the original watching position after the live video changes", async () => {
-  vi.useFakeTimers();
-  try {
-    render(<ChatStateAdapterProvider><Harness /></ChatStateAdapterProvider>);
-    fireEvent.click(screen.getByText("Prepare watching"));
-    fireEvent.click(screen.getByText("Send"));
-    await act(async () => { await vi.advanceTimersByTimeAsync(GIVE_UP_MS); });
-    setWatchingMaterial("video-b");
-    setWatchingViewport(99);
-    fixture.connected = true;
-    await act(async () => { fireEvent.click(screen.getByText("Resend")); });
-    expect(fixture.sent.at(-1)).toMatchObject({
-      type: "start_turn", timed_media_id: "video-a",
-      timed_media_viewport: { time_seconds: 42 },
-    });
-  } finally {
-    vi.useRealTimers();
-  }
-});
 
 it("Stop before admission cannot erase another tab's newer same-ID retry", async () => {
   vi.useFakeTimers();

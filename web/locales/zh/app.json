@@ -2974,7 +2974,7 @@
   "Change reading theme": "切换阅读主题",
   "Switch to two-page spread": "切换到双页排版",
   "Switch to single-page view": "切换到单页排版",
-  "That annotation could not be saved.": "这条标注保存失败。",
+  "That annotation could not be saved.": "这条批注无法保存，请重试。",
   "That annotation could not be removed.": "这条标注删除失败。",
   "Bookmarks": "书签",
   "Remove this bookmark": "移除这条书签",
@@ -5442,5 +5442,9 @@
   "settings.providerServices.customDescription": "此地址需要实现所选协议。下一步填写凭据，并按需增加其他服务类型及其适配器。",
   "settings.providerServices.addHint": "标签表示已有内置适配器，不代表账号权限。同一连接可以用于多类模型，不同账号或独立产品也可以分别添加。",
   "settings.providerServices.catalogListed": "已获取模型列表。请测试具体模型，确认账号的实际调用权限。",
-  "settings.providerServices.partial": "本次仅获取到部分模型列表。未返回的类型仍视为未知，可手动补充。"
+  "settings.providerServices.partial": "本次仅获取到部分模型列表。未返回的类型仍视为未知，可手动补充。",
+  "Add segment note": "添加片段笔记",
+  "Add a note for this segment": "为当前片段添加笔记",
+  "Delete note": "删除笔记",
+  "New note": "新笔记"
 }

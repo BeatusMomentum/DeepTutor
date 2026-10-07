@@ -5442,5 +5442,9 @@
   "settings.providerServices.customDescription": "The URL must implement the selected API. On the next step, add credentials and choose any additional service types and their adapters.",
   "settings.providerServices.addHint": "Tags show built-in integrations, not account permissions. One connection can serve several model types; separate accounts and products can have separate connections.",
   "settings.providerServices.catalogListed": "Model list retrieved. Test a specific model to verify inference access.",
-  "settings.providerServices.partial": "The provider returned only part of the model list. Missing types remain unknown and can be added manually."
+  "settings.providerServices.partial": "The provider returned only part of the model list. Missing types remain unknown and can be added manually.",
+  "Add segment note": "Add segment note",
+  "Add a note for this segment": "Add a note for this segment",
+  "Delete note": "Delete note",
+  "New note": "New note"
 }

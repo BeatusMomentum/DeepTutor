@@ -5458,5 +5458,9 @@
   "settings.providerServices.customDescription": "Adres musi implementować wybrane API. Następnie dodaj dane dostępowe oraz dodatkowe typy usług i adaptery.",
   "settings.providerServices.addHint": "Etykiety oznaczają integracje, nie uprawnienia konta. Jedno połączenie może obsługiwać różne modele; konta i produkty mogą mieć osobne połączenia.",
   "settings.providerServices.catalogListed": "Pobrano listę modeli. Przetestuj model, aby sprawdzić dostęp do wnioskowania.",
-  "settings.providerServices.partial": "Pobrano tylko część listy. Brakujące typy pozostają nieznane i można je dodać ręcznie."
+  "settings.providerServices.partial": "Pobrano tylko część listy. Brakujące typy pozostają nieznane i można je dodać ręcznie.",
+  "Add segment note": "Dodaj notatkę do fragmentu",
+  "Add a note for this segment": "Dodaj notatkę do tego fragmentu",
+  "Delete note": "Usuń notatkę",
+  "New note": "Nowa notatka"
 }
