@@ -1,3 +1,5 @@
+import pytest
+
 from deeptutor.agents.visualize.utils import validate_visualization
 
 VALID_MINDMAP = """mindmap
@@ -54,3 +56,16 @@ def test_mindmap_validation_rejects_markdown_fence() -> None:
 
     assert ok is False
     assert "without a Markdown fence" in error
+
+
+@pytest.mark.parametrize("code", ["mindmap", "mindmap\n  %% no nodes", "mindmap\n\n"])
+def test_mindmap_validation_rejects_missing_root(code: str) -> None:
+    ok, error = validate_visualization(code, "mindmap")
+    assert ok is False
+    assert "exactly one non-empty root" in error
+
+
+def test_mindmap_validation_rejects_child_before_root() -> None:
+    ok, error = validate_visualization("mindmap\n    Early child\n  Root\n    Child", "mindmap")
+    assert ok is False
+    assert "exactly one non-empty root" in error

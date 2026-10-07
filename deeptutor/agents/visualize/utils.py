@@ -183,9 +183,10 @@ def validate_visualization(code: str, render_type: str) -> tuple[bool, str]:
         ]
         if not lines or lines[0][0].strip() != "mindmap":
             return False, "Mermaid mindmap output must start with the `mindmap` keyword."
-        root_indent = min(indent for _, indent in lines[1:])
-        root_lines = [line for line, indent in lines[1:] if indent == root_indent]
-        if len(root_lines) != 1 or not root_lines[0].strip():
+        if len(lines) < 2:
+            return False, "Mermaid mindmap output must contain exactly one non-empty root node."
+        root_indent = lines[1][1]
+        if any(indent <= root_indent for _, indent in lines[2:]):
             return False, "Mermaid mindmap output must contain exactly one non-empty root node."
         if not any(indent > root_indent for _, indent in lines[2:]):
             return False, "Mermaid mindmap output needs at least one child branch."
