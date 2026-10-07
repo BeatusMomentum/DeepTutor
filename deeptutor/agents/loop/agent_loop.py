@@ -107,6 +107,19 @@ MAX_REASONING_ONLY_RECOVERIES = 2
 # user-visible output. Once output is visible, replay is unsafe because it can
 # duplicate prose or tool calls.
 _PROVIDER_RETRY_DELAYS = (0.5, 1.5)
+_STREAM_IDLE_TIMEOUT_SECONDS = 90.0
+
+
+async def _bounded_stream_chunks(stream: Any):
+    """#1421: a connected provider that never produces a chunk must settle."""
+    iterator = stream.__aiter__()
+    while True:
+        try:
+            yield await asyncio.wait_for(iterator.__anext__(), _STREAM_IDLE_TIMEOUT_SECONDS)
+        except StopAsyncIteration:
+            return
+        except TimeoutError:
+            raise LLMProviderTransportError("The model provider stream timed out.") from None
 
 
 def _reasoning_budget_exhausted(result: "LLMCallResult", max_tokens: int) -> bool:
@@ -1247,7 +1260,12 @@ class AgentLoop:
             try:
                 sent_content = [message.get("content") for message in kwargs["messages"]]
                 sent_had_images = has_image_parts(kwargs["messages"])
-                response_stream = await self._create_response_stream(kwargs, trace_meta, stage)
+                # The loop owns retries. Bound both connection setup and idle
+                # reads so cold-start failures cannot park a durable turn.
+                response_stream = await asyncio.wait_for(
+                    self._create_response_stream(kwargs, trace_meta, stage),
+                    _STREAM_IDLE_TIMEOUT_SECONDS,
+                )
                 # Retain an actual provider fallback for later rounds. The
                 # request-only image deduplication must never overwrite history.
                 if sent_had_images and not has_image_parts(kwargs["messages"]):
@@ -1262,7 +1280,7 @@ class AgentLoop:
                     ):
                         if "content" in accepted and accepted["content"] is not sent:
                             original["content"] = accepted["content"]
-                async for chunk in response_stream:
+                async for chunk in _bounded_stream_chunks(response_stream):
                     usage = getattr(chunk, "usage", None)
                     if usage is not None:
                         usage_seen = usage

@@ -2387,6 +2387,55 @@ async def test_midloop_transport_failure_retries_current_round(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["connect", "stream", "partial_stream"])
+async def test_cold_start_stalled_provider_settles_with_bounded_retries(monkeypatch, phase):
+    """#1421: a provider that never raises its own timeout cannot hold discovery forever."""
+    attempts = []
+    stopped = []
+
+    async def stalled_stream():
+        try:
+            if phase == "partial_stream":
+                yield _llm_chunk(content="Partial answer.")
+            await asyncio.Event().wait()
+            yield _llm_chunk(content="unreachable")
+        finally:
+            stopped.append(True)
+
+    async def create(**_kwargs):
+        attempts.append(True)
+        if phase == "connect":
+            await asyncio.Event().wait()
+        return stalled_stream()
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    pipeline = AgenticChatPipeline(language="en")
+    pipeline.registry = _Registry()
+    monkeypatch.setattr(agent_loop_mod, "_PROVIDER_RETRY_DELAYS", (0, 0))
+    monkeypatch.setattr(agent_loop_mod, "_STREAM_IDLE_TIMEOUT_SECONDS", 0.01)
+    monkeypatch.setattr(pipeline, "_compose_enabled_tools", lambda _: ["web_search"])
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+    bus = StreamBus()
+    events, consumer = await _collect_bus_events(bus)
+    try:
+        with pytest.raises(LLMProviderTransportError) as failure:
+            await asyncio.wait_for(
+                pipeline.run(UnifiedContext(session_id="cold", user_message="Hello"), bus), 1
+            )
+        assert failure.value.retryable
+        assert len(attempts) == (1 if phase == "partial_stream" else 3)
+        assert failure.value.partial_response is (phase == "partial_stream")
+        if phase != "connect":
+            assert len(stopped) == len(attempts)
+        assert (
+            sum(event.metadata.get("error_code") == "provider_transport" for event in events) >= 1
+        )
+    finally:
+        await bus.close()
+        await consumer
+
+
+@pytest.mark.asyncio
 async def test_first_round_transport_failure_retries_then_becomes_structured_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
