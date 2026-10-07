@@ -898,6 +898,42 @@ def _restore_sessions(root: Path, source, target) -> None:
             Path(str(target.get_chat_history_db()) + suffix).unlink(missing_ok=True)
 
 
+def _read_journal(path: Path) -> dict:
+    """Validate recovery control data before it can authorize filesystem changes."""
+    row = json.loads(path.read_text())
+    terminal = {"completed", "exported", "recovered"}
+    pending = {
+        "preparing",
+        "copying",
+        "transferring",
+        "committed",
+        "cleanup_required",
+        "recovery_required",
+    }
+    if not isinstance(row, dict) or row.get("id") != path.parent.name:
+        raise ValueError("journal identity is missing or invalid")
+    status = row.get("status")
+    if not isinstance(status, str) or status not in terminal | pending | {"failed"}:
+        raise ValueError("journal status is missing or invalid")
+    if not isinstance(row.get("created_at", ""), str):
+        raise ValueError("journal timestamp is invalid")
+    if status not in terminal:
+        plan = row.get("plan")
+        if not isinstance(plan, dict) or any(
+            not isinstance(plan.get(key), str)
+            for key in ("source_workspace_id", "target_workspace_id")
+        ):
+            raise ValueError("journal recovery plan is missing or invalid")
+        features = plan.get("features")
+        if (
+            not isinstance(features, list)
+            or not features
+            or any(not isinstance(feature, str) or feature not in FEATURES for feature in features)
+        ):
+            raise ValueError("journal recovery features are missing or invalid")
+    return row
+
+
 def _journal_rows() -> list[tuple[Path, dict | None]]:
     """Read every migration journal. Corrupt entries yield ``(path, None)``.
 
@@ -909,9 +945,7 @@ def _journal_rows() -> list[tuple[Path, dict | None]]:
     rows: list[tuple[Path, dict | None]] = []
     for path in _journal_root().glob("*/operation.json"):
         try:
-            row = json.loads(path.read_text())
-            if not isinstance(row, dict):
-                raise ValueError("journal is not a JSON object")
+            row = _read_journal(path)
         except (OSError, ValueError):
             row = None
         rows.append((path, row))
@@ -963,8 +997,8 @@ def assert_no_pending_recovery(*, reject_unreadable: bool = False) -> None:
             if reject_unreadable:
                 raise WorkspaceError(
                     "A migration journal is unreadable, so a pending recovery cannot be "
-                    f"ruled out: {path}. Use Recover migration in Settings → Data migration to "
-                    "quarantine it before changing learning data."
+                    f"ruled out: {path}. Automatic recovery is unavailable; preserve the "
+                    "journal and snapshots for manual repair before migrating data."
                 )
             continue
         if row.get("status") in pending:
@@ -983,23 +1017,15 @@ def recover_operation(operation_id: str) -> dict:
         raise WorkspaceError("Migration not found.")
     with data_activity(exclusive=True):
         try:
-            result = json.loads(journal.read_text())
-            if not isinstance(result, dict):
-                raise ValueError("journal is not a JSON object")
+            result = _read_journal(journal)
         except (OSError, ValueError) as exc:
-            # The plan and status are unrecoverable, so finish- or
-            # rollback-recovery is impossible. Quarantine the journal (the
-            # snapshots stay for inspection) so prechecks pass again.
-            quarantine = root / "operation.json.corrupt"
-            quarantine.unlink(missing_ok=True)
-            journal.rename(quarantine)
-            logger.warning("Quarantined unreadable migration journal %s: %s", journal, exc)
-            return {
-                "id": operation_id,
-                "status": "recovered",
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "recovery_path": str(root),
-            }
+            # Neither rollback nor cleanup is safe without the original plan.
+            # Keep the journal discoverable so subsequent migrations stay blocked.
+            logger.warning("Cannot automatically recover unreadable migration journal %s", journal)
+            raise WorkspaceError(
+                f"Migration journal is unreadable: {journal}. Automatic recovery is "
+                "unavailable; the journal and snapshots have been preserved for manual repair."
+            ) from exc
         if result["status"] in {"completed", "exported", "recovered"}:
             return result
         plan = result["plan"]

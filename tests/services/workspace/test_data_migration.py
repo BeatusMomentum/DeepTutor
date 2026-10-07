@@ -264,11 +264,19 @@ def test_unreadable_journal_blocks_only_migration_paths(account):
         assert_no_pending_recovery(reject_unreadable=True)
     with pytest.raises(WorkspaceError, match=re.escape(str(corrupt_journal))):
         migrate_data("", account.create_workspace("Destination")["workspace_id"], ["chat"])
-    # The settings recover entry quarantines the journal, not a 500.
-    assert recover_operation(corrupt_id)["status"] == "recovered"
-    assert not corrupt_journal.exists()
-    assert (corrupt_dir / "operation.json.corrupt").is_file()
-    assert_no_pending_recovery(reject_unreadable=True)
+    snapshot = corrupt_dir / "snapshot" / "chat.db"
+    snapshot.parent.mkdir()
+    snapshot.write_bytes(b"preserve this recovery copy")
+    # Failed recovery must not hide the blocker or overwrite recovery evidence.
+    for _ in range(2):
+        with pytest.raises(WorkspaceError, match="preserved for manual repair"):
+            recover_operation(corrupt_id)
+        assert corrupt_journal.read_text() == "{ truncated journal"
+        assert snapshot.read_bytes() == b"preserve this recovery copy"
+        assert not (corrupt_dir / "operation.json.corrupt").exists()
+        with pytest.raises(WorkspaceError, match="manual repair"):
+            assert_no_pending_recovery(reject_unreadable=True)
+        assert_no_pending_recovery()
 
 
 def test_crash_during_copy_tracks_partial_destination(account, monkeypatch):
@@ -565,3 +573,38 @@ def test_migration_preview_returns_skip_warnings(account):
     plan = preview("", target, ["book"])
     assert "warnings" in plan
     assert any("book_corrupt/manifest.json" in message for message in plan["warnings"])
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "{}",
+        "[]",
+        '{"status":"completed"}',
+        '{"id":"ID","status":"unknown"}',
+        '{"id":"ID","status":"copying","plan":{}}',
+        '{"id":"ID","status":[]}',
+    ],
+)
+def test_structurally_invalid_journal_requires_manual_repair(account, payload):
+    from deeptutor.services.workspace.data_migration import (
+        _journal_root,
+        assert_no_pending_recovery,
+        operations,
+        recover_operation,
+    )
+
+    operation_id = "a" * 32
+    root = _journal_root() / operation_id
+    root.mkdir()
+    journal = root / "operation.json"
+    content = payload.replace("ID", operation_id)
+    journal.write_text(content)
+
+    assert operations()[0]["status"] == "unreadable"
+    assert_no_pending_recovery()
+    with pytest.raises(WorkspaceError, match="manual repair"):
+        assert_no_pending_recovery(reject_unreadable=True)
+    with pytest.raises(WorkspaceError, match="manual repair"):
+        recover_operation(operation_id)
+    assert journal.read_text() == content
