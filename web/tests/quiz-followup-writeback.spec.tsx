@@ -9,6 +9,12 @@ import {
 import { updateNotebookEntry } from "@/lib/notebook-api";
 import type { QuizQuestion } from "@/lib/quiz-types";
 
+const translations = vi.hoisted(() => ({
+  t: vi.fn((key: string) => key === "Failed to link this follow-up chat to its notebook entry."
+    ? "无法关联笔记条目" : key),
+}));
+vi.mock("react-i18next", () => ({ useTranslation: () => translations }));
+
 const clientInstances = vi.hoisted(
   () =>
     [] as Array<{
@@ -140,7 +146,7 @@ it("surfaces a visible error when the session-id writeback keeps failing", async
   renderFollowup();
   emitSessionEvent();
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    /notebook entry/i,
+    "无法关联笔记条目",
   );
   expect(updateNotebookEntry).toHaveBeenCalledTimes(2);
   expect(updateNotebookEntry).toHaveBeenCalledWith(ENTRY_ID, {

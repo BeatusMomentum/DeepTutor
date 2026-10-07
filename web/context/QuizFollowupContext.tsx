@@ -26,6 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { updateNotebookEntry } from "@/lib/notebook-api";
 import { shouldAppendEventContent } from "@/lib/stream";
 import { hasPendingAskUser } from "@/lib/ask-user-state";
@@ -220,6 +221,7 @@ interface ProviderProps {
 }
 
 export function QuizFollowupProvider({ children }: ProviderProps) {
+  const { t } = useTranslation();
   const [threads, setThreads] = useState<Record<string, FollowupThreadState>>(
     {},
   );
@@ -275,13 +277,13 @@ export function QuizFollowupProvider({ children }: ProviderProps) {
               ...prev,
               error:
                 prev.error ||
-                "Failed to link this follow-up chat to its notebook entry.",
+                t("Failed to link this follow-up chat to its notebook entry."),
             }));
           }
         }
       })();
     },
-    [updateThread],
+    [t, updateThread],
   );
 
   const handleThreadEvent = useCallback(

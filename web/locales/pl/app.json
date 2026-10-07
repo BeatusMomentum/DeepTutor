@@ -5349,5 +5349,6 @@
   "Qwen-Audio TTS requires a Beijing API key. You can set a Beijing workspace URL in the provider connection; the speech endpoint is selected automatically.": "Qwen-Audio TTS wymaga klucza API z regionu Pekin. W połączeniu z dostawcą możesz ustawić adres URL przestrzeni roboczej z regionu Pekin; punkt końcowy mowy zostanie wybrany automatycznie.",
   "Fetching the model list does not test speech synthesis. Use Preview voice to test this model and voice.": "Pobranie listy modeli nie sprawdza syntezy mowy. Użyj podglądu głosu, aby przetestować model i głos.",
   "Show API token": "Pokaż token API",
-  "Hide API token": "Ukryj token API"
+  "Hide API token": "Ukryj token API",
+  "Failed to link this follow-up chat to its notebook entry.": "Nie udało się powiązać tej rozmowy uzupełniającej z wpisem w notatniku."
 }

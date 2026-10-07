@@ -5333,5 +5333,6 @@
   "Speech was generated, but the audio download failed. Try again or check the network connection.": "Die Sprache wurde erzeugt, aber der Audiodownload ist fehlgeschlagen. Versuche es erneut oder prüfe die Netzwerkverbindung.",
   "Request timeout (seconds)": "Zeitlimit für Anfragen (Sekunden)",
   "Show API token": "API-Token anzeigen",
-  "Hide API token": "API-Token ausblenden"
+  "Hide API token": "API-Token ausblenden",
+  "Failed to link this follow-up chat to its notebook entry.": "Dieser Folgechat konnte nicht mit seinem Notizbucheintrag verknüpft werden."
 }

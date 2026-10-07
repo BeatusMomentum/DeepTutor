@@ -5333,5 +5333,6 @@
   "Speech was generated, but the audio download failed. Try again or check the network connection.": "Speech was generated, but the audio download failed. Try again or check the network connection.",
   "Request timeout (seconds)": "Request timeout (seconds)",
   "Show API token": "Show API token",
-  "Hide API token": "Hide API token"
+  "Hide API token": "Hide API token",
+  "Failed to link this follow-up chat to its notebook entry.": "Failed to link this follow-up chat to its notebook entry."
 }
