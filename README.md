@@ -1016,7 +1016,22 @@ The repo ships a root [`SKILL.md`](SKILL.md) — a compact handover doc for the 
 | `deeptutor config show [--home PATH]` | Show resolved runtime configuration with credentials redacted |
 | `deeptutor config providers` | List supported setup providers and defaults as JSON |
 | `deeptutor config apply FILE [--check] [--home PATH]` | Apply setup JSON without prompts, or validate it without writing settings |
-| `deeptutor provider login <provider>` | Provider auth (`openai-codex` OAuth login; `github-copilot` validates an existing Copilot auth session; `codebuddy` validates CodeBuddy SDK auth and starts login when needed) |
+| `deeptutor provider login <provider>` | Provider auth (`openai-codex` OAuth login; `github-copilot` GitHub device login; `codebuddy` validates CodeBuddy SDK auth and starts login when needed) |
+
+GitHub Copilot credentials belong to the signed-in DeepTutor owner and live only at
+`<runtime-home>/data/system/user-secrets/<owner-id>/private/github-copilot/credentials.v1.json`,
+outside sandbox workspaces. CLI/admin partners use the administrator's credentials;
+other users sign in separately, and Copilot profiles cannot be shared through model grants.
+External nanobot/Copilot token files are never imported: after upgrading, run
+`deeptutor provider login github-copilot` again.
+
+Login validates inference with a currently discovered model; `init` validates the selected
+model and aborts on failure without saving the draft configuration. Successful GitHub
+authentication alone does not establish Copilot model access (the saved login is retained
+if validation fails). Runtime requests follow the API endpoint returned by token exchange,
+including refreshes, and respect each model's Responses/Chat Completions endpoint metadata.
+
+Copilot-specific Responses compatibility is applied at dispatch without rewriting stored history.
 
 </details>
 

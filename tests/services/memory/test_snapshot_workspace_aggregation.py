@@ -28,6 +28,7 @@ from deeptutor.services.path_service import PathService
 class _FakePathService:
     def __init__(self, db_path: Path) -> None:
         self._db_path = db_path
+        self.workspace_root = db_path.parent
 
     def get_chat_history_db(self) -> Path:
         return self._db_path
@@ -110,7 +111,7 @@ def _with_bindings(
     default_db: Path,
     bindings: list[SimpleNamespace],
 ) -> None:
-    monkeypatch.setattr(adapters, "get_path_service", lambda: _FakePathService(default_db))
+    monkeypatch.setattr(adapters, "get_account_path_service", lambda: _FakePathService(default_db))
     monkeypatch.setattr(
         "deeptutor.services.workspace.get_content_workspace_service",
         lambda: SimpleNamespace(registered_bindings=lambda: bindings),
@@ -219,9 +220,7 @@ def test_broken_binding_is_skipped_fail_open(
 ) -> None:
     _add_session(default_db, "s1", "Still visible")
     # A binding whose data store does not exist (moved / never provisioned)
-    # contributes nothing but must not blank the account-wide scan. (The
-    # symlink-refusal branch mirrors WorkspacePathService and cannot be
-    # exercised here — creating symlinks on Windows needs privileges.)
+    # contributes nothing but must not blank the account-wide scan.
     _with_bindings(
         monkeypatch,
         tmp_path / "default" / "chat_history.db",
@@ -251,3 +250,69 @@ def test_enumeration_failure_falls_back_to_default_only(
     entities = adapters.read_chat_entities()
 
     assert [e.id for e in entities] == ["s1"]
+
+
+@pytest.mark.parametrize(
+    "redirected",
+    [".deeptutor", ".deeptutor/data", ".deeptutor/data/user", ".deeptutor/data/user/workspace"],
+)
+def test_redirected_private_store_is_skipped(
+    tmp_path: Path, default_db: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch, redirected: str
+) -> None:
+    _add_session(default_db, "s-default", "Default chat")
+    root = tmp_path / "workspace"
+    target = tmp_path / "external"
+    target.mkdir()
+    link = root / redirected
+    link.parent.mkdir(parents=True)
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"Directory symlinks unavailable: {exc}")
+    db_path = PathService(workspace_root=_workspace_data_root(root)).get_chat_history_db()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with _make_db(db_path) as conn:
+        _add_session(conn, "private", "Must not read redirected storage", question="Private quiz")
+    _with_bindings(
+        monkeypatch, tmp_path / "default" / "chat_history.db", [_binding("linked", root)]
+    )
+
+    assert [e.id for e in adapters.read_chat_entities()] == ["s-default"]
+    assert [e.id for e in adapters.probe_chat_entities()] == ["s-default"]
+    assert adapters.read_quiz_entities() == []
+
+
+def test_active_custom_workspace_does_not_replace_default(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from deeptutor.services.workspace.context import (
+        WorkspacePathService,
+        WorkspaceScope,
+        workspace_context,
+    )
+
+    account = PathService(workspace_root=tmp_path / "account")
+    root = tmp_path / "custom"
+    scope = WorkspaceScope("custom", account.workspace_root, root)
+    custom = WorkspacePathService(account, scope)
+    for paths, title in [(account, "Default"), (custom, "Custom")]:
+        db_path = paths.get_chat_history_db()
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        with _make_db(db_path) as conn:
+            _add_session(conn, "shared", title, question=title)
+    monkeypatch.setattr("deeptutor.multi_user.paths.get_account_path_service", lambda: account)
+    monkeypatch.setattr(adapters, "get_account_path_service", lambda: account)
+    monkeypatch.setattr(
+        "deeptutor.services.workspace.get_content_workspace_service",
+        lambda: SimpleNamespace(
+            registered_bindings=lambda: [_binding("custom", root)],
+            binding_by_id=lambda _: _binding("custom", root),
+        ),
+    )
+
+    with workspace_context(scope):
+        assert adapters.get_path_service().get_chat_history_db() == custom.get_chat_history_db()
+        chats = adapters.read_chat_entities()
+        assert {e.id: e.label for e in chats} == {"shared": "Default", "ws:custom:shared": "Custom"}
+        assert {e.id for e in adapters.probe_chat_entities()} == {"shared", "ws:custom:shared"}
+        assert {e.id for e in adapters.read_quiz_entities()} == {"shared:q1", "ws:custom:shared:q1"}

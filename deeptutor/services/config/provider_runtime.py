@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import ipaddress
 import json
 from typing import Any
 from urllib.parse import urlparse
@@ -282,6 +283,15 @@ EMBEDDING_PROVIDERS: dict[str, EmbeddingProviderSpec] = {
         default_api_base=EMBEDDING_PROVIDER_DEFAULT_ENDPOINTS["openrouter"],
         keywords=("openrouter",),
         is_local=False,
+    ),
+    "opper": EmbeddingProviderSpec(
+        label="Opper",
+        adapter="openai_compat",
+        default_api_base=EMBEDDING_PROVIDER_DEFAULT_ENDPOINTS["opper"],
+        keywords=("opper",),
+        is_local=False,
+        default_model="openai/text-embedding-3-large",
+        default_dim=3072,
     ),
 }
 
@@ -1016,6 +1026,53 @@ def _coerce_optional_int(value: Any) -> int | None:
     return parsed if parsed > 0 else None
 
 
+def _is_nonpublic_embedding_host(hostname: str) -> bool:
+    """Loopback, LAN, and container names that are not a public vendor host."""
+    host = hostname.lower().strip("[]").rstrip(".")
+    if not host:
+        return False
+    if host in {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+        "lemonade",
+        "host.docker.internal",
+        "gateway.docker.internal",
+    }:
+        return True
+    if host.endswith(".local") or host.endswith(".internal"):
+        return True
+    # Docker Compose service names are a single DNS label.
+    if "." not in host:
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return bool(address.is_private or address.is_loopback or address.is_link_local)
+
+
+def _is_legacy_lemonade_endpoint(api_base: str) -> bool:
+    """Keyless Lemonade servers saved as a generic OpenAI-compatible URL.
+
+    Unraid and Docker installs often point at a LAN address or
+    ``host.docker.internal`` and store the chat root (``/api/v1``) rather than
+    the embeddings path. Those still have to resolve as local Lemonade, or
+    knowledge-base creation demands an API key the server does not use (#1782).
+    A public host on the same port stays a remote OpenAI-compatible endpoint.
+    """
+    try:
+        endpoint = urlparse(api_base if "://" in api_base else f"http://{api_base}")
+        if endpoint.port != 13305:
+            return False
+    except ValueError:
+        return False
+    if not _is_nonpublic_embedding_host(endpoint.hostname or ""):
+        return False
+    path = endpoint.path.rstrip("/")
+    return path.endswith(("/embeddings", "/v1")) or path in {"", "/"}
+
+
 def _resolve_embedding_provider(
     *,
     hint: str | None,
@@ -1023,25 +1080,25 @@ def _resolve_embedding_provider(
     api_base: str | None,
     provider_pool: dict[str, NormalizedProviderConfig],
 ) -> str:
-    if api_base:
+    if api_base and _is_legacy_lemonade_endpoint(api_base) and hint in {None, "custom", "openai"}:
         # Older keyless Lemonade profiles were saved as generic OpenAI
-        # Compatible embeddings. Recognize its known endpoint before a Qwen3
-        # model name is mistaken for a remote embedding vendor (#1568).
+        # Compatible embeddings. Recognize that endpoint before a Qwen3 model
+        # name is mistaken for a remote embedding vendor (#1568, #1782).
+        return "lemonade"
+
+    if _is_local_base_url(api_base) and hint in {None, "custom", "openai"}:
+        # Ollama also serves OpenAI-compatible embeddings on /v1/embeddings.
+        # Select the wire protocol by path, not by a port substring.
+        endpoint = urlparse(api_base if "://" in api_base else f"http://{api_base}")
+        path = endpoint.path.rstrip("/")
         try:
-            endpoint = urlparse(api_base if "://" in api_base else f"http://{api_base}")
-            lemonade_endpoint = (
-                endpoint.port == 13305
-                and endpoint.path.rstrip("/").endswith(("/v1/embeddings", "/api/v1/embeddings"))
-                and (
-                    (endpoint.hostname or "").lower()
-                    in {"localhost", "127.0.0.1", "::1", "lemonade"}
-                    or (endpoint.hostname or "").lower().endswith(".local")
-                )
-            )
+            native_root = not path and endpoint.port == 11434
         except ValueError:
-            lemonade_endpoint = False
-        if lemonade_endpoint and hint in {None, "custom", "openai"}:
-            return "lemonade"
+            native_root = False
+        if path in {"/api/embed", "/api/embeddings"} or native_root:
+            return "ollama"
+        return "vllm"
+
     if hint and hint in EMBEDDING_PROVIDERS:
         return hint
 
@@ -1053,11 +1110,6 @@ def _resolve_embedding_provider(
     for provider_name, spec in EMBEDDING_PROVIDERS.items():
         if any(keyword in model_lower for keyword in spec.keywords):
             return provider_name
-
-    if _is_local_base_url(api_base):
-        if api_base and "11434" in api_base:
-            return "ollama"
-        return "vllm"
 
     for provider_name, spec in EMBEDDING_PROVIDERS.items():
         configured = provider_pool.get(provider_name)
@@ -1125,6 +1177,11 @@ def resolve_embedding_runtime_config(
             api_base = gemini_default_embedding_endpoint(resolved_model)
         elif spec.default_api_base:
             api_base = spec.default_api_base
+    if provider_name == "lemonade" and api_base:
+        # Chat-root URLs such as ``/api/v1`` are what Settings saves for an
+        # OpenAI-compatible Lemonade connection. Embedding calls need the
+        # ``/embeddings`` path or the client rejects them after the key check.
+        api_base = normalize_embedding_endpoint_for_display("lemonade", api_base)
     if provider_name == "aliyun":
         # DashScope's SDK derives the endpoint from the model id and ignores any
         # configured URL, so a saved multimodal endpoint would mislead the

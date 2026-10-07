@@ -10,9 +10,12 @@ intentionally thin so the order of steps is easy to read top-to-bottom.
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
+import time
 from typing import Any
 
+import httpx
 from rich.console import Console
 import typer
 
@@ -20,45 +23,10 @@ from . import init_wizard as wiz
 
 
 def _reset_runtime_singletons() -> None:
-    """Drop cached service instances so the new DEEPTUTOR_HOME takes effect.
+    """Compatibility entry point for runtime-home selection."""
+    from deeptutor.runtime.cache_reset import reset_runtime_singletons
 
-    ``deeptutor init`` may pass ``--home`` to target a different workspace; the
-    singletons cache paths from the *previous* PathService and will silently
-    write to the wrong place if not cleared.
-    """
-    try:
-        from deeptutor.services.path_service import PathService
-
-        PathService.reset_instance()
-    except Exception:
-        pass
-    try:
-        from deeptutor.services.config.runtime_settings import RuntimeSettingsService
-
-        RuntimeSettingsService._instances.clear()
-    except Exception:
-        pass
-    try:
-        from deeptutor.services.config.model_catalog import ModelCatalogService
-
-        ModelCatalogService._instances.clear()
-    except Exception:
-        pass
-    # Multi-user paths can be imported by the CLI before --home is processed.
-    # Their admin/global settings roots must follow the selected runtime too.
-    import sys
-
-    paths = sys.modules.get("deeptutor.multi_user.paths")
-    if paths is not None:
-        from deeptutor.runtime.home import get_runtime_home
-
-        paths.PROJECT_ROOT = get_runtime_home()
-        paths.ADMIN_WORKSPACE_ROOT = paths.PROJECT_ROOT / "data"
-        paths.USERS_ROOT = paths.ADMIN_WORKSPACE_ROOT / "users"
-        paths.SYSTEM_ROOT = paths.ADMIN_WORKSPACE_ROOT / "system"
-        paths.LEGACY_MULTI_USER_ROOT = paths.PROJECT_ROOT / "multi-user"
-        paths._path_services.clear()
-        paths._legacy_migration_done = False
+    reset_runtime_singletons()
 
 
 def _ensure_model_service(catalog: dict, service_name: str, profile_id: str, model_id: str):
@@ -127,6 +95,15 @@ def _llm_step(
         display_provider = "Custom"
         env_key = ""
 
+    if binding == "github_copilot":
+        return _github_copilot_step(
+            console,
+            strings,
+            base_url=default_base,
+            current_model=str(current_model.get("model") or ""),
+            display_provider=display_provider,
+        )
+
     edit_base = typer.confirm(strings["init.edit_base_url"], default=not bool(default_base))
     if edit_base:
         base_url = typer.prompt(strings["init.new_base_url"], default=default_base or "")
@@ -169,6 +146,78 @@ def _llm_step(
     if typer.confirm(strings["init.probe_offer"], default=True):
         _probe_llm_with_retry(console, strings, choice)
 
+    return choice
+
+
+def _github_copilot_step(
+    console: Console,
+    strings: dict,
+    *,
+    base_url: str,
+    current_model: str,
+    display_provider: str,
+) -> wiz.LLMChoice:
+    from deeptutor.services.github_copilot_auth import (
+        list_github_copilot_models,
+        load_github_token,
+        login_github_copilot,
+    )
+    from deeptutor.services.llm.provider_core.github_copilot_provider import (
+        validate_github_copilot_model,
+    )
+
+    try:
+        token = load_github_token()
+        reuse = bool(token) and typer.confirm(
+            strings["init.copilot_reuse_login"].format(
+                account=getattr(token, "account_id", None) or "GitHub"
+            ),
+            default=True,
+        )
+        if not reuse:
+            wiz.info(console, strings["init.copilot_login_start"])
+            token = asyncio.run(login_github_copilot(print_fn=console.print))
+            wiz.ok(
+                console,
+                strings["init.copilot_login_ok"].format(
+                    account=getattr(token, "account_id", None) or "GitHub"
+                ),
+            )
+        models = asyncio.run(list_github_copilot_models())
+        if not models:
+            raise RuntimeError("No usable GitHub Copilot models are available for this account.")
+        wiz.ok(console, strings["init.fetch_models_ok"].format(count=len(models)))
+    except (httpx.HTTPError, OSError, RuntimeError, ValueError, KeyError) as exc:
+        wiz.fail(console, strings["init.copilot_login_fail"].format(error=str(exc)[:200]))
+        raise typer.Exit(code=1) from exc
+
+    model = wiz.select_model(
+        console,
+        strings,
+        models=models,
+        current=current_model,
+    )
+    choice = wiz.LLMChoice(
+        binding="github_copilot",
+        base_url=base_url,
+        api_key="",
+        model=model,
+        display_provider=display_provider,
+    )
+    wiz.info(console, strings["init.probe_running"].format(what=display_provider))
+    started = time.monotonic()
+    try:
+        asyncio.run(validate_github_copilot_model(model))
+    except (httpx.HTTPError, OSError, RuntimeError, ValueError) as exc:
+        wiz.fail(
+            console,
+            strings["init.probe_fail"].format(what=display_provider, error=str(exc)[:200]),
+        )
+        raise typer.Exit(code=1) from exc
+    choice.probed = True
+    choice.probe_ok = True
+    choice.probe_ms = int((time.monotonic() - started) * 1000)
+    wiz.ok(console, strings["init.probe_ok"].format(what=display_provider, ms=choice.probe_ms))
     return choice
 
 
