@@ -46,7 +46,11 @@ from deeptutor.agents.loop.context_budget import LLMRequestSnapshot
 from deeptutor.agents.loop.dsml_tool_calls import DSMLStreamFilter, extract_dsml_tool_calls
 from deeptutor.core.context import UnifiedContext
 from deeptutor.core.trace import build_trace_metadata, merge_trace_metadata, new_call_id
-from deeptutor.runtime.agentic.messages import assistant_message_with_tool_calls
+from deeptutor.runtime.agentic.messages import (
+    assistant_message_with_tool_calls,
+    extend_transient_model_messages,
+    with_transient_model_messages,
+)
 from deeptutor.runtime.agentic.think_stream import InlineThinkFilter
 from deeptutor.runtime.agentic.tool_call_stream import ToolCallAccumulator
 from deeptutor.runtime.agentic.tool_dispatch import DispatchOutcome
@@ -278,6 +282,9 @@ class AgentLoop:
         self._tool_schema_catalog = tool_schemas
         self._last_request: LLMRequestSnapshot | None = None
         self._request_tools: list[dict[str, Any]] | None = tool_schemas
+        # #1611: retrieved pixels belong to this turn's requests, never to
+        # durable history. Both loop engines share the same ordering/budget.
+        self._transient_model_messages: list[dict[str, Any]] = []
         self._request_fingerprint = (context.runtime.previous_model_turn or {}).get(
             "request_fingerprint"
         )
@@ -704,6 +711,7 @@ class AgentLoop:
             state.tool_steps += 1
             state.sources.extend(dispatch.sources)
             messages.extend(dispatch.tool_messages)
+            extend_transient_model_messages(self._transient_model_messages, dispatch.model_messages)
 
             if dispatch.pause:
                 resumed = await self.pipeline._await_user_reply_and_resolve(
@@ -1023,7 +1031,8 @@ class AgentLoop:
         defer_visible_output: bool = False,
         tool_choice: str | None = None,
     ) -> LLMCallResult:
-        await self.pipeline._guard_context_window(messages, self.stream)
+        request_messages = with_transient_model_messages(messages, self._transient_model_messages)
+        await self.pipeline._guard_context_window(request_messages, self.stream)
         stage = self.stage
         call_id = new_call_id(f"{self.source}-{stage}")
         trace_meta = build_trace_metadata(
@@ -1050,7 +1059,7 @@ class AgentLoop:
             "messages": deduplicate_user_images(
                 [
                     {key: value for key, value in message.items() if key != "_context_snapshot"}
-                    for message in messages
+                    for message in request_messages
                 ]
             ),
             "stream": True,
@@ -1246,8 +1255,11 @@ class AgentLoop:
                     # replaced only on the wire. Otherwise the next round would
                     # retry images the provider has already rejected.
                     strip_image_parts_inplace(messages)
+                    strip_image_parts_inplace(self._transient_model_messages)
                 else:
-                    for original, accepted, sent in zip(messages, kwargs["messages"], sent_content):
+                    for original, accepted, sent in zip(
+                        request_messages, kwargs["messages"], sent_content
+                    ):
                         if "content" in accepted and accepted["content"] is not sent:
                             original["content"] = accepted["content"]
                 async for chunk in response_stream:

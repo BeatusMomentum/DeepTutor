@@ -206,6 +206,201 @@ async def _run(pipeline: AgenticChatPipeline, context: UnifiedContext):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("evidence", ["available", "text_only", "missing", "inaccessible"])
+async def test_active_mastery_retrieves_verified_pixels_without_persisting_them(
+    monkeypatch, tmp_path, evidence
+):
+    """#1611: exercise the active Mastery loop, real RAG tool and verified store."""
+    import base64
+
+    from deeptutor.multi_user import knowledge_access
+    from deeptutor.services.rag.visual_assets import VisualAssetStore, collect_visual_assets
+    from deeptutor.tools import rag_tool
+    from deeptutor.tools.builtin import RAGTool
+    from tests.services.rag.test_visual_assets import _fixture
+
+    kb_dir, source, image, parsed = _fixture(tmp_path)
+    candidate = collect_visual_assets(parsed, source, kb_dir)[0]
+    store = VisualAssetStore(kb_dir)
+    store.publish([candidate])
+    if evidence == "missing":
+        (store.root / (candidate.record["asset_id"] + ".png")).unlink()
+    monkeypatch.setattr(
+        knowledge_access,
+        "resolve_for_rag",
+        lambda _name: (
+            None if evidence == "inaccessible" else SimpleNamespace(name="kb", base_dir=tmp_path)
+        ),
+    )
+
+    async def search(**_kwargs):
+        return {
+            "content": "The source contains a learning curve.",
+            "sources": [{"visual_asset_id": candidate.record["asset_id"]}],
+        }
+
+    monkeypatch.setattr(rag_tool, "rag_search", search)
+
+    class Registry(_Registry):
+        def build_openai_schemas(self, _enabled):
+            schemas = super().build_openai_schemas(_enabled)
+            return [
+                *schemas,
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "rag",
+                        "description": "Search selected sources",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "query": {"type": "string"},
+                                "kb_name": {"type": "string"},
+                            },
+                            "required": ["query", "kb_name"],
+                        },
+                    },
+                },
+            ]
+
+        async def execute(self, name, **kwargs):
+            if name == "rag":
+                return await RAGTool().execute(**kwargs)
+            return await super().execute(name, **kwargs)
+
+    client = _ScriptedChatClient(
+        [
+            [
+                _llm_chunk(
+                    tool_calls=[
+                        {
+                            "id": "figure",
+                            "name": "rag",
+                            "arguments": '{"query":"curve","kb_name":"kb"}',
+                        },
+                        {"id": "other", "name": "web_search", "arguments": '{"query":"context"}'},
+                    ],
+                    finish_reason="tool_calls",
+                )
+            ],
+            [_llm_chunk(content="Source-backed explanation.", finish_reason="stop")],
+        ]
+    )
+    pipeline = MasteryLoopPipeline(language="en")
+    pipeline.model = "gpt-3.5-turbo" if evidence == "text_only" else "gpt-4o"
+    pipeline.registry = Registry()
+    monkeypatch.setattr(pipeline, "_compose_enabled_tools", lambda _: ["rag", "web_search"])
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+    monkeypatch.setattr(pipeline, "_capability_finish_instruction", lambda *_: None)
+    context = UnifiedContext(session_id="s", user_message="Explain the original figure.")
+    events = await _run(pipeline, context)
+
+    request = client.calls[1]["messages"]
+    images = [
+        part
+        for msg in request
+        if isinstance(msg.get("content"), list)
+        for part in msg["content"]
+        if part.get("type") == "image_url"
+    ]
+    if evidence == "available":
+        assert len(images) == 1
+        assert (
+            base64.b64decode(images[0]["image_url"]["url"].split(",", 1)[1]) == image.read_bytes()
+        )
+        tool_positions = [i for i, msg in enumerate(request) if msg.get("role") == "tool"]
+        image_position = next(
+            i
+            for i, msg in enumerate(request)
+            if msg.get("content") and isinstance(msg["content"], list)
+        )
+        assert image_position > max(tool_positions)
+        assert candidate.record["asset_id"] in str(request[image_position])
+    else:
+        assert images == []
+        tool_text = next(msg["content"] for msg in request if msg.get("tool_call_id") == "figure")
+        assert (
+            "cannot inspect source image pixels"
+            if evidence == "text_only"
+            else "unavailable for pixel inspection"
+        ) in tool_text
+    assert "base64" not in json.dumps(context.runtime.model_turn)
+    assert "data:image" not in str(events)
+
+
+@pytest.mark.asyncio
+async def test_active_loop_bounds_source_images_across_rounds_and_retains_fallback(monkeypatch):
+    """Private source evidence is bounded and rejected pixels are not retried each round."""
+    from copy import deepcopy
+
+    from deeptutor.services.llm.multimodal import has_image_parts
+
+    class Registry(_Registry):
+        async def execute(self, name, **kwargs):
+            result = await super().execute(name, **kwargs)
+            count = len(self.executed)
+            result.model_message = {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{count}{i}"}}
+                    for i in range(2)
+                ],
+            }
+            return result
+
+    client = _ScriptedChatClient(
+        [
+            [
+                _llm_chunk(
+                    tool_calls=[
+                        {"id": "one", "name": "web_search", "arguments": '{"query":"one"}'}
+                    ],
+                    finish_reason="tool_calls",
+                )
+            ],
+            [
+                _llm_chunk(
+                    tool_calls=[
+                        {"id": "two", "name": "web_search", "arguments": '{"query":"two"}'}
+                    ],
+                    finish_reason="tool_calls",
+                )
+            ],
+            [_llm_chunk(content="Continue.", finish_reason="length")],
+            [_llm_chunk(content="Done.", finish_reason="stop")],
+        ]
+    )
+    create = client.chat.completions.create
+    attempts = []
+
+    async def reject_latest_images(**kwargs):
+        attempts.append(deepcopy(kwargs["messages"]))
+        if client.call_count == 2 and has_image_parts(kwargs["messages"]):
+            raise RuntimeError("image input is not supported")
+        return await create(**kwargs)
+
+    client.chat.completions.create = reject_latest_images
+    pipeline = AgenticChatPipeline(language="en")
+    pipeline.model = "gpt-3.5-turbo"
+    pipeline.registry = Registry()
+    monkeypatch.setattr(pipeline, "_compose_enabled_tools", lambda _: ["web_search"])
+    monkeypatch.setattr(pipeline, "_build_openai_client", lambda: client)
+    context = UnifiedContext(session_id="s", user_message="Explain source figures.")
+    await _run(pipeline, context)
+    images = [
+        part["image_url"]["url"]
+        for msg in attempts[2]
+        if isinstance(msg.get("content"), list)
+        for part in msg["content"]
+        if part.get("type") == "image_url"
+    ]
+    assert images == ["data:image/png;base64,20", "data:image/png;base64,21"]
+    assert not has_image_parts(attempts[3])
+    assert not has_image_parts(attempts[4])
+    assert "base64" not in json.dumps(context.runtime.model_turn)
+
+
+@pytest.mark.asyncio
 async def test_rejected_forced_choice_keeps_schemas_for_all_later_rounds(monkeypatch):
     client = _ScriptedChatClient(
         [

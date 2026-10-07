@@ -651,7 +651,7 @@ def test_visual_message_reaches_next_model_request_without_stream_leak(tmp_path:
 
 
 def test_visual_messages_follow_complete_tool_reply_batch():
-    from deeptutor.runtime.agentic.loop import _with_transient_model_messages
+    from deeptutor.runtime.agentic.messages import with_transient_model_messages
 
     messages = [
         {"role": "assistant", "tool_calls": [{"id": "rag"}, {"id": "other"}]},
@@ -665,7 +665,7 @@ def test_visual_messages_follow_complete_tool_reply_batch():
             "_after_tool_call_id": "rag",
         }
     ]
-    request = _with_transient_model_messages(messages, transient)
+    request = with_transient_model_messages(messages, transient)
     assert [item["role"] for item in request] == ["assistant", "tool", "tool", "user"]
     assert request[-1]["content"] == transient[0]["content"]
     assert messages[-1]["role"] == "tool"  # canonical history was not changed
