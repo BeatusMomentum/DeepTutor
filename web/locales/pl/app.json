@@ -5462,5 +5462,16 @@
   "Add segment note": "Dodaj notatkę do fragmentu",
   "Add a note for this segment": "Dodaj notatkę do tego fragmentu",
   "Delete note": "Usuń notatkę",
-  "New note": "Nowa notatka"
+  "New note": "Nowa notatka",
+  "Learning journal": "Dziennik nauki",
+  "Your tutor's mission, handoff and confirmed learning records.": "Cel, przekazanie sesji i potwierdzone notatki zapisane przez tutora.",
+  "Current mission": "Bieżący cel nauki",
+  "Last-session handoff": "Przekazanie ostatniej sesji",
+  "Next focus": "Następny temat",
+  "Confirmed learning records": "Potwierdzone notatki z nauki",
+  "No confirmed learning records yet.": "Brak potwierdzonych notatek z nauki.",
+  "No session handoff yet.": "Brak przekazania sesji.",
+  "Your tutor has no mission for you yet. Ask it to set one in conversation.": "Tutor nie zapisał jeszcze twojego celu. Poproś go o ustalenie celu w rozmowie.",
+  "Could not read the learning journal. Its original data is preserved. Try refreshing.": "Nie udało się odczytać dziennika. Oryginalne dane są zachowane. Spróbuj odświeżyć.",
+  "Level": "Poziom"
 }

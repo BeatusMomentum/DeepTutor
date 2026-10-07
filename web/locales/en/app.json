@@ -5446,5 +5446,16 @@
   "Add segment note": "Add segment note",
   "Add a note for this segment": "Add a note for this segment",
   "Delete note": "Delete note",
-  "New note": "New note"
+  "New note": "New note",
+  "Learning journal": "Learning journal",
+  "Your tutor's mission, handoff and confirmed learning records.": "Your tutor's mission, handoff and confirmed learning records.",
+  "Current mission": "Current mission",
+  "Last-session handoff": "Last-session handoff",
+  "Next focus": "Next focus",
+  "Confirmed learning records": "Confirmed learning records",
+  "No confirmed learning records yet.": "No confirmed learning records yet.",
+  "No session handoff yet.": "No session handoff yet.",
+  "Your tutor has no mission for you yet. Ask it to set one in conversation.": "Your tutor has no mission for you yet. Ask it to set one in conversation.",
+  "Could not read the learning journal. Its original data is preserved. Try refreshing.": "Could not read the learning journal. Its original data is preserved. Try refreshing.",
+  "Level": "Level"
 }
