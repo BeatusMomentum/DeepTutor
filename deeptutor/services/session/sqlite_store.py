@@ -2139,7 +2139,7 @@ class SQLiteSessionStore:
         with self._connect() as conn:
             msg = conn.execute(
                 """
-                SELECT id, session_id, role, attachments_json, metadata_json, created_at
+                SELECT id, session_id, role, attachments_json, metadata_json, created_at, parent_message_id
                 FROM messages
                 WHERE id = ?
                 """,
@@ -2158,9 +2158,9 @@ class SQLiteSessionStore:
             if role == "user":
                 paired_msg = conn.execute(
                     """
-                    SELECT id, session_id, role, attachments_json, metadata_json, created_at
+                    SELECT id, session_id, role, attachments_json, metadata_json, created_at, parent_message_id
                     FROM messages
-                    WHERE session_id = ? AND role = 'assistant' AND id > ?
+                    WHERE session_id = ? AND role = 'assistant' AND parent_message_id = ?
                     ORDER BY id ASC
                     LIMIT 1
                     """,
@@ -2169,13 +2169,13 @@ class SQLiteSessionStore:
             elif role == "assistant":
                 paired_msg = conn.execute(
                     """
-                    SELECT id, session_id, role, attachments_json, metadata_json, created_at
+                    SELECT id, session_id, role, attachments_json, metadata_json, created_at, parent_message_id
                     FROM messages
-                    WHERE session_id = ? AND role = 'user' AND id < ?
+                    WHERE session_id = ? AND role = 'user' AND id = ?
                     ORDER BY id DESC
                     LIMIT 1
                     """,
-                    (session_id, int(message_id)),
+                    (session_id, msg["parent_message_id"]),
                 ).fetchone()
 
             user_msg = msg if role == "user" else paired_msg
@@ -2241,6 +2241,21 @@ class SQLiteSessionStore:
                     "turn_id": turn_id,
                     "was_active": True,
                 }
+
+            if role == "assistant" and paired_msg is not None:
+                # Regenerated answers share their question with sibling answers.
+                # Deleting one branch must keep the question those siblings use.
+                sibling = conn.execute(
+                    """
+                    SELECT 1 FROM messages
+                    WHERE session_id = ? AND role = 'assistant'
+                      AND parent_message_id = ? AND id != ?
+                    LIMIT 1
+                    """,
+                    (session_id, paired_msg["id"], int(message_id)),
+                ).fetchone()
+                if sibling is not None:
+                    paired_msg = None
 
             attachment_ids: list[str] = []
             for m in [msg, paired_msg]:

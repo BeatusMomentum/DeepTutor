@@ -1021,6 +1021,57 @@ def test_delete_regenerated_assistant_message_resolves_its_own_turn(
     assert asyncio.run(store.get_turn(t1["id"])) is not None
     assert asyncio.run(store.get_turn(t2["id"])) is not None
     assert asyncio.run(store.get_turn(t3["id"])) is None
+    remaining = asyncio.run(store.get_messages(sid))
+    assert [m["content"] for m in remaining] == ["q1", "a1", "q2", "a2"]
+    assert remaining[1]["parent_message_id"] == u1
+    assert remaining[3]["parent_message_id"] == u2
+
+
+def test_delete_unanswered_user_does_not_pair_with_another_branch(
+    store: SQLiteSessionStore,
+) -> None:
+    sid = asyncio.run(store.create_session())["id"]
+    t1 = asyncio.run(store.begin_turn(sid, capability="chat"))
+    u1 = asyncio.run(store.add_message(sid, "user", "unanswered", metadata={"turn_id": t1["id"]}))
+    asyncio.run(store.transition_turn(t1["id"], "failed", expected_status="running"))
+    u2 = asyncio.run(store.add_message(sid, "user", "other question", parent_message_id=None))
+    a2 = asyncio.run(store.add_message(sid, "assistant", "other answer", parent_message_id=u2))
+
+    result = asyncio.run(store.delete_turn_by_message(sid, u1))
+
+    assert result["deleted"] is True
+    assert [m["id"] for m in asyncio.run(store.get_messages(sid))] == [u2, a2]
+
+
+def test_delete_regenerated_answer_leaves_parked_turn_and_shared_question(
+    store: SQLiteSessionStore,
+) -> None:
+    sid = asyncio.run(store.create_session())["id"]
+    t1 = asyncio.run(store.begin_turn(sid, capability="chat"))
+    u1 = asyncio.run(store.add_message(sid, "user", "q1", metadata={"turn_id": t1["id"]}))
+    a1 = asyncio.run(store.add_message(sid, "assistant", "a1", parent_message_id=u1))
+    asyncio.run(store.link_turn_message(t1["id"], a1))
+    asyncio.run(store.transition_turn(t1["id"], "completed", expected_status="running"))
+    regenerated_turn = asyncio.run(store.begin_turn(sid, capability="chat"))
+    regenerated = asyncio.run(
+        store.add_message(sid, "assistant", "regenerated", parent_message_id=u1)
+    )
+    asyncio.run(store.link_turn_message(regenerated_turn["id"], regenerated))
+    asyncio.run(
+        store.transition_turn(regenerated_turn["id"], "completed", expected_status="running")
+    )
+    waiting = asyncio.run(store.begin_turn(sid, capability="ask_questions"))
+    asyncio.run(store.add_message(sid, "user", "q2", metadata={"turn_id": waiting["id"]}))
+    asyncio.run(store.transition_turn(waiting["id"], "waiting_input", expected_status="running"))
+
+    result = asyncio.run(store.delete_turn_by_message(sid, regenerated))
+
+    assert result["deleted"] is True
+    assert [m["content"] for m in asyncio.run(store.get_messages(sid))] == ["q1", "a1", "q2"]
+    assert asyncio.run(store.get_turn(t1["id"])) is not None
+    parked = asyncio.run(store.get_turn(waiting["id"]))
+    assert parked is not None
+    assert parked["status"] == "waiting_input"
 
 
 def test_delete_legacy_message_uses_ordering_fallback(store: SQLiteSessionStore) -> None:
