@@ -1085,6 +1085,43 @@ def test_delete_legacy_message_uses_ordering_fallback(store: SQLiteSessionStore)
     parked = asyncio.run(store.get_turn(str(ids["t2"])))
     assert parked is not None
     assert parked["status"] == "waiting_input"
+    remaining = asyncio.run(store.get_messages(str(ids["sid"])))
+    assert [message["id"] for message in remaining] == [ids["u2"]]
+
+
+@pytest.mark.parametrize("delete_role", ["user", "assistant"])
+def test_delete_migrated_legacy_pair_leaves_later_turn_intact(
+    store: SQLiteSessionStore,
+    delete_role: str,
+) -> None:
+    sid, ids = _seed_chat(store, turns=2)
+    # Recreate the historical schema without branch pointers, then reopen it
+    # through the actual migration before exercising message deletion.
+    with store._connect() as conn:
+        conn.execute("DROP INDEX idx_messages_parent")
+        conn.execute("ALTER TABLE messages DROP COLUMN parent_message_id")
+    migrated = SQLiteSessionStore(db_path=store.db_path)
+    messages = asyncio.run(migrated.get_messages(sid))
+    assert messages[1]["parent_message_id"] == ids[0]
+
+    target = ids[0] if delete_role == "user" else ids[1]
+    assert asyncio.run(migrated.delete_turn_by_message(sid, target))["deleted"] is True
+    remaining = asyncio.run(migrated.get_messages(sid))
+    assert [message["id"] for message in remaining] == ids[2:]
+    assert remaining[0]["parent_message_id"] is None
+    assert remaining[1]["parent_message_id"] == ids[2]
+
+
+def test_delete_explicit_root_assistant_does_not_guess_a_user(
+    store: SQLiteSessionStore,
+) -> None:
+    sid, ids = _seed_chat(store, turns=1)
+    root_answer = asyncio.run(
+        store.add_message(sid, "assistant", "root answer", parent_message_id=None)
+    )
+
+    assert asyncio.run(store.delete_turn_by_message(sid, root_answer))["deleted"] is True
+    assert [message["id"] for message in asyncio.run(store.get_messages(sid))] == ids
 
 
 # ── Context messages ──────────────────────────────────────────────
