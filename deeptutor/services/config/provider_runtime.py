@@ -283,15 +283,6 @@ EMBEDDING_PROVIDERS: dict[str, EmbeddingProviderSpec] = {
         keywords=("openrouter",),
         is_local=False,
     ),
-    "orcarouter": EmbeddingProviderSpec(
-        label="OrcaRouter",
-        adapter="openai_compat",
-        default_api_base=EMBEDDING_PROVIDER_DEFAULT_ENDPOINTS["orcarouter"],
-        keywords=("orcarouter", "orca_router"),
-        is_local=False,
-        default_model="openai/text-embedding-3-large",
-        default_dim=3072,
-    ),
 }
 
 

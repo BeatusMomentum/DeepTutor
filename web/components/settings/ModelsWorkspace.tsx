@@ -1,5 +1,6 @@
 "use client";
 
+import { scrollToSettingsElement } from "@/features/settings/navigation/settings-scroll";
 import Tooltip from "@/shared/ui/Tooltip";
 import { stageRegistryAction, type RegistryEdit } from "@/lib/provider-registry";
 import { useEffect, useId, useRef, useState } from "react";
@@ -99,10 +100,7 @@ export function ModelsWorkspace({
   const revealDetail = () => {
     if (window.matchMedia("(max-width: 1279px)").matches)
       requestAnimationFrame(() =>
-        editorRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        }),
+        scrollToSettingsElement(editorRef.current),
       );
   };
   const selectModel = (key: string) => {

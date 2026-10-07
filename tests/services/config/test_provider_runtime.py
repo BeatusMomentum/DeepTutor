@@ -136,13 +136,13 @@ def test_llm_api_base_keyword_gateway() -> None:
     assert resolved.extra_headers == {"APP-Code": "x"}
 
 
-def test_llm_orcarouter_binding_uses_default_endpoint() -> None:
+def test_llm_orcarouter_uses_explicit_custom_endpoint() -> None:
     catalog = _build_catalog(
         llm_profile={
             "id": "llm-p",
             "name": "OrcaRouter",
-            "binding": "orcarouter",
-            "base_url": "",
+            "binding": "custom",
+            "base_url": "https://api.orcarouter.ai/v1",
             "api_key": "sk-orca-test-key",
             "api_version": "",
             "extra_headers": {},
@@ -150,46 +150,8 @@ def test_llm_orcarouter_binding_uses_default_endpoint() -> None:
         }
     )
     resolved = resolve_llm_runtime_config(catalog=catalog)
-    assert resolved.provider_name == "orcarouter"
-    assert resolved.provider_mode == "gateway"
-    assert resolved.effective_url == "https://api.orcarouter.ai/v1"
-
-
-def test_llm_orcarouter_key_prefix_gateway() -> None:
-    catalog = _build_catalog(
-        llm_profile={
-            "id": "llm-p",
-            "name": "LLM",
-            "binding": "",
-            "base_url": "",
-            "api_key": "sk-orca-test-key",
-            "api_version": "",
-            "extra_headers": {},
-            "models": [{"id": "llm-m", "name": "m", "model": "anthropic/claude-sonnet-4.6"}],
-        }
-    )
-    resolved = resolve_llm_runtime_config(catalog=catalog)
-    assert resolved.provider_name == "orcarouter"
-    assert resolved.provider_mode == "gateway"
-    assert resolved.effective_url == "https://api.orcarouter.ai/v1"
-
-
-def test_llm_orcarouter_base_keyword_gateway() -> None:
-    catalog = _build_catalog(
-        llm_profile={
-            "id": "llm-p",
-            "name": "LLM",
-            "binding": "",
-            "base_url": "https://api.orcarouter.ai/v1",
-            "api_key": "k",
-            "api_version": "",
-            "extra_headers": {},
-            "models": [{"id": "llm-m", "name": "m", "model": "deepseek/deepseek-v4-pro"}],
-        }
-    )
-    resolved = resolve_llm_runtime_config(catalog=catalog)
-    assert resolved.provider_name == "orcarouter"
-    assert resolved.provider_mode == "gateway"
+    assert resolved.provider_name == "custom"
+    assert resolved.provider_mode == "direct"
     assert resolved.effective_url == "https://api.orcarouter.ai/v1"
 
 

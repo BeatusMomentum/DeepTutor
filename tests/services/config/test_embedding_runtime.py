@@ -206,13 +206,13 @@ def test_remote_openai_compatible_endpoint_still_requires_key() -> None:
         get_embedding_config(catalog=catalog)
 
 
-def test_embedding_orcarouter_binding_uses_default_endpoint() -> None:
+def test_embedding_orcarouter_uses_explicit_custom_endpoint() -> None:
     catalog = _build_catalog(
         embedding_profile={
             "id": "embedding-p",
             "name": "Embedding",
-            "binding": "orcarouter",
-            "base_url": "",
+            "binding": "custom",
+            "base_url": "https://api.orcarouter.ai/v1/embeddings",
             "api_key": "sk-orca-test-key",
             "api_version": "",
             "extra_headers": {},
@@ -227,8 +227,8 @@ def test_embedding_orcarouter_binding_uses_default_endpoint() -> None:
         }
     )
     resolved = resolve_embedding_runtime_config(catalog=catalog)
-    assert resolved.provider_name == "orcarouter"
-    assert resolved.provider_mode == "standard"
+    assert resolved.provider_name == "custom"
+    assert resolved.provider_mode == "direct"
     assert resolved.effective_url == "https://api.orcarouter.ai/v1/embeddings"
     assert resolved.dimension == 3072
 
