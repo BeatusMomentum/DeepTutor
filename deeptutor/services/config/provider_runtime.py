@@ -299,7 +299,7 @@ EMBEDDING_PROVIDERS: dict[str, EmbeddingProviderSpec] = {
         default_api_base=EMBEDDING_PROVIDER_DEFAULT_ENDPOINTS["opper"],
         keywords=("opper",),
         is_local=False,
-        default_model="text-embedding-3-large",
+        default_model="openai/text-embedding-3-large",
         default_dim=3072,
     ),
 }

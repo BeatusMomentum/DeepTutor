@@ -296,7 +296,7 @@ def test_embedding_opper_binding_uses_default_endpoint() -> None:
                 {
                     "id": "embedding-m",
                     "name": "opper",
-                    "model": "text-embedding-3-large",
+                    "model": "openai/text-embedding-3-large",
                     "dimension": "3072",
                 }
             ],
