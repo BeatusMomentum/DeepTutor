@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import shutil
@@ -24,6 +25,8 @@ from deeptutor.services.path_service import get_path_service
 from deeptutor.services.workspace.activity import data_activity
 from deeptutor.services.workspace.context import workspace_context
 from deeptutor.services.workspace.models import WorkspaceError
+
+logger = logging.getLogger(__name__)
 
 FEATURES = {
     "chat": "Conversations",
@@ -315,8 +318,9 @@ def preview(
         sessions = _sessions(source)
         from deeptutor.services.workspace.dependencies import dependency_closure
 
+        closure_warnings: list[str] = []
         selected, session_ids = dependency_closure(
-            source, sessions, features, session_ids=session_ids
+            source, sessions, features, session_ids=session_ids, warnings=closure_warnings
         )
         # Legacy capability artifacts may be keyed by turn IDs. Preserve a
         # copy of the chat/output trees while transferring only selected rows.
@@ -419,6 +423,7 @@ def preview(
             "files": sum(row["files"] for row in rows),
             "bytes": sum(row["bytes"] for row in rows),
             "blockers": blockers,
+            "warnings": closure_warnings,
             "rows": rows,
             "artifact_files": artifacts,
         }
@@ -504,7 +509,7 @@ def export_data(source_id: str, features: list[str], *, include_historical: bool
     root = _journal_root() / operation_id
     root.mkdir()
     with data_activity(exclusive=True), workspace_context(source_id):
-        assert_no_pending_recovery()
+        assert_no_pending_recovery(reject_unreadable=True)
         plan = preview(source_id, "", features)
         paths = get_path_service()
         manifests = {}
@@ -555,7 +560,7 @@ def migrate_data(
     from deeptutor.services.workspace.session_transfer import transfer_sessions
 
     with data_activity(exclusive=True):
-        assert_no_pending_recovery()
+        assert_no_pending_recovery(reject_unreadable=True)
         if "chat" in features or "attachments" in features:
             from deeptutor.services.storage.attachment_store import (
                 LocalDiskAttachmentStore,
@@ -893,17 +898,58 @@ def _restore_sessions(root: Path, source, target) -> None:
             Path(str(target.get_chat_history_db()) + suffix).unlink(missing_ok=True)
 
 
-def operations() -> list[dict]:
-    rows = []
+def _journal_rows() -> list[tuple[Path, dict | None]]:
+    """Read every migration journal. Corrupt entries yield ``(path, None)``.
+
+    Journals are only written through :func:`atomic_write_json`, so an
+    unreadable journal means real corruption rather than a torn write. This
+    helper runs inside the per-request recovery precheck, so it stays silent;
+    ``operations`` and the strict prechecks do the reporting.
+    """
+    rows: list[tuple[Path, dict | None]] = []
     for path in _journal_root().glob("*/operation.json"):
         try:
-            rows.append(json.loads(path.read_text()))
+            row = json.loads(path.read_text())
+            if not isinstance(row, dict):
+                raise ValueError("journal is not a JSON object")
         except (OSError, ValueError):
-            continue
+            row = None
+        rows.append((path, row))
+    return rows
+
+
+def operations() -> list[dict]:
+    rows = []
+    for path, row in _journal_rows():
+        if row is None:
+            logger.warning("Listing unreadable migration journal %s for recovery.", path)
+            try:
+                created_at = datetime.fromtimestamp(
+                    path.stat().st_mtime, tz=timezone.utc
+                ).isoformat()
+            except OSError:
+                created_at = ""
+            rows.append(
+                {
+                    "id": path.parent.name,
+                    "status": "unreadable",
+                    "created_at": created_at,
+                    "error": f"Migration journal is unreadable: {path}",
+                }
+            )
+        else:
+            rows.append(row)
     return sorted(rows, key=lambda row: row.get("created_at", ""), reverse=True)
 
 
-def assert_no_pending_recovery() -> None:
+def assert_no_pending_recovery(*, reject_unreadable: bool = False) -> None:
+    """Fail when a recovery may be pending.
+
+    Readable journals with a pending status always fail. An unreadable
+    journal cannot prove a pending recovery, and this precheck runs on every
+    request, so only migration-class callers pass ``reject_unreadable``;
+    failing every request would lock the whole app behind one corrupt file.
+    """
     pending = {
         "preparing",
         "copying",
@@ -912,7 +958,15 @@ def assert_no_pending_recovery() -> None:
         "cleanup_required",
         "recovery_required",
     }
-    for row in operations():
+    for path, row in _journal_rows():
+        if row is None:
+            if reject_unreadable:
+                raise WorkspaceError(
+                    "A migration journal is unreadable, so a pending recovery cannot be "
+                    f"ruled out: {path}. Use Recover migration in Settings → Data migration to "
+                    "quarantine it before changing learning data."
+                )
+            continue
         if row.get("status") in pending:
             raise WorkspaceError(
                 "A data migration needs recovery. Open Settings → Data migration before changing learning data."
@@ -928,7 +982,24 @@ def recover_operation(operation_id: str) -> dict:
     if not journal.exists():
         raise WorkspaceError("Migration not found.")
     with data_activity(exclusive=True):
-        result = json.loads(journal.read_text())
+        try:
+            result = json.loads(journal.read_text())
+            if not isinstance(result, dict):
+                raise ValueError("journal is not a JSON object")
+        except (OSError, ValueError) as exc:
+            # The plan and status are unrecoverable, so finish- or
+            # rollback-recovery is impossible. Quarantine the journal (the
+            # snapshots stay for inspection) so prechecks pass again.
+            quarantine = root / "operation.json.corrupt"
+            quarantine.unlink(missing_ok=True)
+            journal.rename(quarantine)
+            logger.warning("Quarantined unreadable migration journal %s: %s", journal, exc)
+            return {
+                "id": operation_id,
+                "status": "recovered",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "recovery_path": str(root),
+            }
         if result["status"] in {"completed", "exported", "recovered"}:
             return result
         plan = result["plan"]
