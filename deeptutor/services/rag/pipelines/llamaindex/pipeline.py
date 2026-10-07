@@ -229,6 +229,10 @@ class LlamaIndexPipeline:
                 f"(chunking + embedding)..."
             )
 
+            # #1802: validate and publish pixels before persisting nodes that
+            # reference them. Failed indexing can leave unused immutable assets;
+            # failed asset publication must not leave a partially accepted index.
+            VisualAssetStore(kb_dir).publish(visual_candidates, prune_missing=True)
             await _run_with_stall_guard(
                 lambda: storage.create_index(
                     documents, storage_dir, show_progress=should_show_progress()
@@ -238,7 +242,6 @@ class LlamaIndexPipeline:
             )
 
             self.logger.info(f"Index persisted to {storage_dir}")
-            VisualAssetStore(kb_dir).publish(visual_candidates, prune_missing=True)
             if signature is not None:
                 write_version_meta(kb_dir, signature, storage_dir=storage_dir)
 
@@ -423,6 +426,7 @@ class LlamaIndexPipeline:
                 self.logger.warning("No valid documents to add")
                 return False
 
+            VisualAssetStore(kb_dir).publish(visual_candidates)
             if plan.existing_storage is not None:
                 self.logger.info(f"Loading existing index from {plan.existing_storage}...")
                 num_added = await _run_with_stall_guard(
@@ -433,7 +437,6 @@ class LlamaIndexPipeline:
                     worker_key=str(kb_dir.resolve()),
                 )
                 self.logger.info(f"Added {num_added} documents to existing index")
-                VisualAssetStore(kb_dir).publish(visual_candidates)
                 if signature is not None and plan.storage_dir != plan.existing_storage:
                     write_version_meta(kb_dir, signature, storage_dir=plan.storage_dir)
             else:
@@ -447,7 +450,6 @@ class LlamaIndexPipeline:
                     worker_key=str(kb_dir.resolve()),
                 )
                 self.logger.info(f"Created new index with {num_added} documents")
-                VisualAssetStore(kb_dir).publish(visual_candidates)
                 if signature is not None:
                     write_version_meta(kb_dir, signature, storage_dir=plan.storage_dir)
 
