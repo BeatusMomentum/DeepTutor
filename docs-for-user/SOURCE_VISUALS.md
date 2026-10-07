@@ -17,9 +17,9 @@ the verified image pixels in its next request. A text only model receives the
 caption and context with an explicit warning that it has not seen the pixels.
 All supported extracted images are retained, each image is limited to 5 MiB,
 and at most two retrieved images are sent in one model continuation. The
-document retention count is independent of this model request budget. A visual
-manifest larger than 16 MiB fails publication explicitly rather than silently
-retaining only an initial subset of the document.
+document retention count is independent of this model request budget. There is
+no document figure-count ceiling or KB-wide 16 MiB manifest ceiling. Unreadable
+manifests fail writes explicitly and remain preserved.
 
 Current extraction coverage depends on the selected parser. MinerU can emit
 structured PDF figures. PyMuPDF4LLM can emit PDF and EPUB images when image
@@ -27,8 +27,56 @@ extraction is enabled, but its Markdown output does not supply page boxes.
 The default text only parser and the current Docling adapter do not emit
 source image assets. Images that are only vector drawing commands, or pages
 that require OCR when no usable OCR engine is configured, may be absent.
-Other RAG providers do not yet index this visual manifest. Interactive
-exercises, visual annotations, and mastery updates are separate future work.
+Other RAG providers do not yet index this visual manifest for semantic discovery.
+Exact visual and PDF page inspection is independent of the embedding engine.
+
+## Exact figures, original pages and coverage
+
+In a KB's Files view, select a document and expand **Source visual coverage**.
+It shows retained figures, paginated original-image links, and known skipped,
+failed or unverified extraction locations. A parser returning no images never
+establishes that a document has no visual information. The report describes
+extraction; it does not certify index readiness or every visual in the book.
+
+The existing `rag` tool also accepts `source_path`, `figure`, `asset_id`, `page`,
+`region` and `source_hash`. Use `kb_files` to obtain an exact document path.
+Figure and table references keep their type and number; English/Chinese labels
+are equivalent. A label shared by different sources is ambiguous and requires
+selection. For concept discovery, use the existing semantic retrieval and, when
+needed, a query in the source language. Keep the resulting document, section,
+caption and page together instead of treating a similar figure as a match.
+
+For vector drawings, sparse captions or layout-dependent tables, inspect a PDF
+page directly. Exact printed-reference discovery scans only a selected unlocked
+PDF, up to 2000 pages; multiple mentions remain page choices. A known page can
+be selected independently of that discovery limit. Rendering reads the original
+PDF locally, without OCR/model downloads or a cloud call. Full pages preserve
+layout; normalized `region=[x0,y0,x1,y1]` crops spend the bounded pixel budget on
+more detail. Parser-supplied panel groups on one PDF page resolve to the complete
+page. Structured table headers/cells/units and notes remain text evidence when
+supplied; the original page is available for verification.
+
+Page inspection supports PDFs up to 512 MiB, with at most 8 million rendered
+pixels and 5 MiB image bytes. Locked/damaged PDFs, invalid regions and unreadable
+labels have explicit limitations. Other formats retain supported extracted
+images and original-document access; PDF rendering is not silently applied to
+them. Increased rendering scale does not recover information absent from a scan.
+
+Each explanation includes original pixels and a source location. Captions and
+page text are distinguished from observed image facts. Re-retrieve the same
+immutable `asset_id` for detailed follow-ups; `source_hash` protects page links.
+Compatible reindexing keeps older asset IDs available. Changed or missing sources
+are reported, and an old reference is never redirected to new material. Compare
+two sources in separate bounded calls. If either evidence cannot be inspected,
+select a page/region, clarify the source, or state that a supported comparison
+cannot be made. No whole-book image upload or mandatory external enrichment is
+required.
+
+Synthetic regression fixtures contain 100 source figures plus vector, structured
+table and multi-panel pages. Expected early/middle/late references, Chinese-to-
+English figure labels, headers/units/notes, original bytes, ambiguous matches,
+unavailable pixels and changed-source abstentions are checked independently of
+language-model fluency.
 
 
 ## Token estimates for image requests

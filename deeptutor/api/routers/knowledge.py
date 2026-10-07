@@ -3221,10 +3221,69 @@ async def serve_kb_visual_asset(kb_name: str, asset_id: str):
     if loaded is None:
         raise HTTPException(status_code=404, detail="Visual asset not found")
     record, data = loaded
+    from deeptutor.services.rag.source_visuals import source_state
+
+    if source_state(raw_dir.parent, record) in {"changed", "missing"}:
+        raise HTTPException(
+            status_code=409,
+            detail="The referenced source changed or is missing. Select its current version explicitly.",
+        )
     return Response(
         content=data,
         media_type=record["mime_type"],
         headers={"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@router.get("/knowledge-bases/{kb_name}/visual-coverage")
+async def kb_visual_coverage(
+    kb_name: str,
+    source_path: str = "",
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=200),
+):
+    from deeptutor.services.rag.visual_coverage import coverage_overview
+
+    raw_dir = _resolve_kb_raw_dir(kb_name)
+    assert raw_dir is not None
+    try:
+        return await asyncio.to_thread(
+            coverage_overview, raw_dir.parent, source_path=source_path, offset=offset, limit=limit
+        )
+    except (OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Visual coverage is unreadable; original evidence files have been preserved.",
+        ) from exc
+
+
+@router.get("/knowledge-bases/{kb_name}/source-page")
+async def kb_source_page(
+    kb_name: str,
+    source_path: str,
+    page: int = Query(..., ge=1),
+    source_hash: str = "",
+    region: str = "",
+):
+    from deeptutor.services.rag.source_visuals import page_image
+
+    raw_dir = _resolve_kb_raw_dir(kb_name)
+    assert raw_dir is not None
+    try:
+        crop = [float(value) for value in region.split(",")] if region else None
+        record, image = await asyncio.to_thread(
+            page_image, raw_dir.parent, source_path, page, expected_hash=source_hash, region=crop
+        )
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return Response(
+        content=image,
+        media_type=record["mime_type"],
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Source-Document-ID": record["source_document_id"],
+        },
     )
 
 

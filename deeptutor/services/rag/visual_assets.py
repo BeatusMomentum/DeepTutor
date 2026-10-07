@@ -119,6 +119,7 @@ def _block_details(
             block.get("caption")
             or block.get("image_caption")
             or block.get("chart_caption")
+            or block.get("table_caption")
             or block.get("captions")
         )
         context = _text(block.get("text") or block.get("content"))
@@ -183,7 +184,13 @@ def collect_visual_assets(
     source_hash = _sha256_file(source)
     candidates: list[VisualAssetCandidate] = []
     for path in sorted(asset_dir.iterdir()):
-        loaded = _image_bytes(path)
+        try:
+            loaded = _image_bytes(path)
+        except OSError:
+            logger.warning(
+                "Unable to read parser asset %s; coverage report will record it", path.name
+            )
+            continue
         if loaded is None:
             continue
         image, mime = loaded
@@ -216,6 +223,27 @@ def collect_visual_assets(
             "mime_type": mime,
             "size": len(image),
         }
+        from deeptutor.services.rag.source_visuals import figure_labels
+
+        record["figure_labels"] = figure_labels(caption)
+        matching = [
+            block
+            for block in (parsed.blocks or [])
+            if isinstance(block, dict)
+            and str(block.get("img_path") or block.get("path") or "")
+            and Path(str(block.get("img_path") or block.get("path"))).resolve() == path.resolve()
+        ]
+        if matching:
+            block = matching[0]
+            record.update(
+                {
+                    "kind": str(block.get("type") or "image"),
+                    "section": _text(block.get("section") or block.get("section_title")),
+                    "group_id": str(block.get("group_id") or block.get("figure_id") or ""),
+                    "table_html": _text(block.get("table_body") or block.get("table_html")),
+                    "notes": _text(block.get("notes") or block.get("table_footnote")),
+                }
+            )
         candidates.append(VisualAssetCandidate(path=path, record=record))
     return candidates
 

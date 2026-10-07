@@ -5457,5 +5457,20 @@
   "No session handoff yet.": "No session handoff yet.",
   "Your tutor has no mission for you yet. Ask it to set one in conversation.": "Your tutor has no mission for you yet. Ask it to set one in conversation.",
   "Could not read the learning journal. Its original data is preserved. Try refreshing.": "Could not read the learning journal. Its original data is preserved. Try refreshing.",
-  "Level": "Level"
+  "Level": "Level",
+  "Source visual coverage": "Source visual coverage",
+  "Extracted figures do not prove complete visual coverage. Inspect the original page when labels, vectors or tables are missing.": "Extracted figures do not prove complete visual coverage. Inspect the original page when labels, vectors or tables are missing.",
+  "Could not read visual coverage. Open the original document to inspect the source.": "Could not read visual coverage. Open the original document to inspect the source.",
+  "Retained source figures": "Retained source figures",
+  "Open original document": "Open original document",
+  "PDF pages and higher-detail regions are available through source inspection in chat.": "PDF pages and higher-detail regions are available through source inspection in chat.",
+  "Source figure": "Source figure",
+  "Source document is unavailable. Refresh the file list.": "Source document is unavailable. Refresh the file list.",
+  "visualCoverage.symbolic_link": "Symbolic-link image skipped",
+  "visualCoverage.exceeds_5_mib": "Image exceeds 5 MiB; inspect the original page",
+  "visualCoverage.unsupported_or_invalid_pixels": "Unsupported or invalid image pixels",
+  "visualCoverage.asset_read_failed": "Image read failed; inspect the original page",
+  "visualCoverage.table_structure_requires_source_verification": "Verify table structure against the original page",
+  "visualCoverage.referenced_image_not_retained": "Referenced image not retained; inspect its source page",
+  "visualCoverage.extraction_coverage_unknown": "Extraction coverage has not been verified"
 }

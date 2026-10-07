@@ -5473,5 +5473,20 @@
   "No session handoff yet.": "Brak przekazania sesji.",
   "Your tutor has no mission for you yet. Ask it to set one in conversation.": "Tutor nie zapisał jeszcze twojego celu. Poproś go o ustalenie celu w rozmowie.",
   "Could not read the learning journal. Its original data is preserved. Try refreshing.": "Nie udało się odczytać dziennika. Oryginalne dane są zachowane. Spróbuj odświeżyć.",
-  "Level": "Poziom"
+  "Level": "Poziom",
+  "Source visual coverage": "Pokrycie ilustracji źródłowych",
+  "Extracted figures do not prove complete visual coverage. Inspect the original page when labels, vectors or tables are missing.": "Wyodrębnione ilustracje nie oznaczają pełnego pokrycia treści wizualnej. Sprawdź oryginalną stronę, jeśli brakuje etykiet, grafiki wektorowej lub tabel.",
+  "Could not read visual coverage. Open the original document to inspect the source.": "Nie udało się odczytać pokrycia ilustracji. Otwórz oryginalny dokument, aby sprawdzić źródło.",
+  "Retained source figures": "Zachowane ilustracje źródłowe",
+  "Open original document": "Otwórz oryginalny dokument",
+  "PDF pages and higher-detail regions are available through source inspection in chat.": "Strony PDF i bardziej szczegółowe wycinki można sprawdzić w rozmowie.",
+  "Source figure": "Ilustracja źródłowa",
+  "Source document is unavailable. Refresh the file list.": "Dokument źródłowy jest niedostępny. Odśwież listę plików.",
+  "visualCoverage.symbolic_link": "Pominięto obraz będący dowiązaniem symbolicznym",
+  "visualCoverage.exceeds_5_mib": "Obraz przekracza limit 5 MiB; sprawdź oryginalną stronę",
+  "visualCoverage.unsupported_or_invalid_pixels": "Nieobsługiwany format lub nieprawidłowe dane obrazu",
+  "visualCoverage.asset_read_failed": "Nie udało się odczytać obrazu; sprawdź oryginalną stronę",
+  "visualCoverage.table_structure_requires_source_verification": "Struktura tabeli wymaga sprawdzenia na oryginalnej stronie",
+  "visualCoverage.referenced_image_not_retained": "Nie zachowano wskazanego obrazu; sprawdź stronę źródłową",
+  "visualCoverage.extraction_coverage_unknown": "Pokrycie wyodrębniania nie zostało zweryfikowane"
 }

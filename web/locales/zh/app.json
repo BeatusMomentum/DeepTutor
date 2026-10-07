@@ -5457,5 +5457,20 @@
   "No session handoff yet.": "暂无会话交接。",
   "Your tutor has no mission for you yet. Ask it to set one in conversation.": "导师尚未记录你的学习目标。在对话中请导师设置一个目标。",
   "Could not read the learning journal. Its original data is preserved. Try refreshing.": "无法读取学习日志，原始数据已保留。请尝试刷新。",
-  "Level": "学习程度"
+  "Level": "学习程度",
+  "Source visual coverage": "来源图像覆盖情况",
+  "Extracted figures do not prove complete visual coverage. Inspect the original page when labels, vectors or tables are missing.": "提取的图像不代表视觉内容已完整覆盖。标签、矢量图或表格缺失时，请检查原始页面。",
+  "Could not read visual coverage. Open the original document to inspect the source.": "无法读取图像覆盖情况。请打开原始文档检查来源。",
+  "Retained source figures": "保留的来源图像",
+  "Open original document": "打开原始文档",
+  "PDF pages and higher-detail regions are available through source inspection in chat.": "可在对话中检查 PDF 原始页面及更清晰的局部区域。",
+  "Source figure": "来源图像",
+  "Source document is unavailable. Refresh the file list.": "来源文档不可用，请刷新文件列表。",
+  "visualCoverage.symbolic_link": "跳过符号链接图像",
+  "visualCoverage.exceeds_5_mib": "图像超过 5 MiB 限制；请检查原始页面",
+  "visualCoverage.unsupported_or_invalid_pixels": "图像格式不受支持或像素无效",
+  "visualCoverage.asset_read_failed": "读取图像失败；请检查原始页面",
+  "visualCoverage.table_structure_requires_source_verification": "表格结构需要对照原始页面核验",
+  "visualCoverage.referenced_image_not_retained": "引用的图像未保留；请检查该来源页面",
+  "visualCoverage.extraction_coverage_unknown": "提取覆盖情况尚未核验"
 }

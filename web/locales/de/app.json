@@ -5457,5 +5457,20 @@
   "No session handoff yet.": "Noch keine Sitzungsübergabe.",
   "Your tutor has no mission for you yet. Ask it to set one in conversation.": "Dein Tutor hat noch kein Lernziel für dich. Bitte ihn im Gespräch, eines festzulegen.",
   "Could not read the learning journal. Its original data is preserved. Try refreshing.": "Das Lernjournal konnte nicht gelesen werden. Die Originaldaten bleiben erhalten. Versuche es erneut.",
-  "Level": "Niveau"
+  "Level": "Niveau",
+  "Source visual coverage": "Abdeckung der Quellabbildungen",
+  "Extracted figures do not prove complete visual coverage. Inspect the original page when labels, vectors or tables are missing.": "Extrahierte Abbildungen belegen keine vollständige visuelle Abdeckung. Prüfe die Originalseite bei fehlenden Beschriftungen, Vektorgrafiken oder Tabellen.",
+  "Could not read visual coverage. Open the original document to inspect the source.": "Die visuelle Abdeckung konnte nicht gelesen werden. Öffne das Originaldokument zur Prüfung.",
+  "Retained source figures": "Gespeicherte Quellabbildungen",
+  "Open original document": "Originaldokument öffnen",
+  "PDF pages and higher-detail regions are available through source inspection in chat.": "PDF-Seiten und detailliertere Ausschnitte können im Chat als Quellen geprüft werden.",
+  "Source figure": "Quellabbildung",
+  "Source document is unavailable. Refresh the file list.": "Das Quelldokument ist nicht verfügbar. Aktualisiere die Dateiliste.",
+  "visualCoverage.symbolic_link": "Symbolisch verknüpfte Abbildung übersprungen",
+  "visualCoverage.exceeds_5_mib": "Abbildung überschreitet 5 MiB; prüfe die Originalseite",
+  "visualCoverage.unsupported_or_invalid_pixels": "Nicht unterstützte oder ungültige Bilddaten",
+  "visualCoverage.asset_read_failed": "Abbildung konnte nicht gelesen werden; prüfe die Originalseite",
+  "visualCoverage.table_structure_requires_source_verification": "Tabellenstruktur muss anhand der Originalseite geprüft werden",
+  "visualCoverage.referenced_image_not_retained": "Referenzierte Abbildung wurde nicht gespeichert; prüfe die Quellseite",
+  "visualCoverage.extraction_coverage_unknown": "Extraktionsabdeckung ist noch ungeprüft"
 }
