@@ -48,7 +48,7 @@ flowchart LR
 - 数据结构：`Event`（type/task_id/agent_output/event_id/timestamp，:31-55）；`EventType` 只有三种完成事件（:22-28）。
 - `EventBus` 是进程级单例（:69-88）：每个事件类型一个 handler 列表 + 一个 `asyncio.Queue`。
 - 发布：`publish()` 只做入队，首发布时自动 `start()` 后台消费协程（:101-106）。
-- 消费：`_process_events()` 逐事件串行调用 handler；单个 handler 抛错记 `logger.error` 并继续，不中断、不重投（:122-136）。这是"不丢事件、不放大故障"的基本盘。
+- 消费：`_process_events()` 逐事件串行调用 handler；单个 handler 抛错记 `logger.error` 并继续，不中断、不重投（:122-136）。这会隔离处理器故障，但失败的调用不会重试，不能保证事件处理成功。内存队列也不提供崩溃后的恢复；持久化 turn 事件的回放由 turn runtime 和 session store 负责。
 - 生命周期：`flush(timeout)` 等待队列排空，超时只 warning（:153-165）；`stop()` 先 join（10s 超时，超时即"部分事件可能丢失"，:167-185）。app 启动时拉起（api/main.py:174-181），关停时停止（api/main.py:393-396）。
 - **关键事实**：生产代码里只有两处 `publish`——orchestrator 每个 turn 结束发 `CAPABILITY_COMPLETE`（deeptutor/runtime/orchestrator.py:204-219），伙伴主动消息同样发（deeptutor/services/partners/manager.py:784-796）；但仓库内没有任何 `EventType` 的生产订阅者。SOLVE_COMPLETE / QUESTION_COMPLETE 无人发布也无人订阅。它目前是"随时可挂分析器"的预留口，不是前端数据的来源——找进度问题不要看这里。
 
