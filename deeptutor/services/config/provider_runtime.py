@@ -325,73 +325,62 @@ TTS_PROVIDERS: dict[str, VoiceProviderSpec] = {
         default_api_base="https://api.xiaomimimo.com/v1",
         adapter="mimo_tts",
         default_model="mimo-v2.5-tts",
-        default_voice="mimo_default",
     ),
     "minimax": VoiceProviderSpec(
         label="MiniMax",
         default_api_base="https://api.minimax.io/v1",
         adapter="minimax",
         default_model="speech-2.8-hd",
-        default_voice="English_expressive_narrator",
     ),
     "volcengine_speech": VoiceProviderSpec(
         label="Volcengine Speech (Doubao)",
         default_api_base="https://openspeech.bytedance.com/api/v3",
         adapter="volcengine",
         default_model="seed-tts-2.0",
-        default_voice="zh_female_vv_uranus_bigtts",
     ),
     "dashscope": VoiceProviderSpec(
         label="Aliyun DashScope",
         default_api_base="https://dashscope.aliyuncs.com/api/v1",
         adapter="dashscope",
         default_model="qwen3-tts-flash",
-        default_voice="Cherry",
     ),
     "openai": VoiceProviderSpec(
         label="OpenAI",
         default_api_base="https://api.openai.com/v1",
         default_model="gpt-4o-mini-tts",
-        default_voice="alloy",
     ),
     "openrouter": VoiceProviderSpec(
         label="OpenRouter",
         default_api_base="https://openrouter.ai/api/v1",
         adapter="openrouter_tts",
         default_model="openai/gpt-4o-mini-tts",
-        default_voice="alloy",
     ),
     "groq": VoiceProviderSpec(
         label="Groq",
         default_api_base="https://api.groq.com/openai/v1",
         default_model="canopylabs/orpheus-v1-english",
-        default_voice="autumn",
     ),
     "siliconflow": VoiceProviderSpec(
         label="SiliconFlow",
         default_api_base="https://api.siliconflow.cn/v1",
         default_model="FunAudioLLM/CosyVoice2-0.5B",
-        default_voice="FunAudioLLM/CosyVoice2-0.5B:alex",
     ),
     "azure_openai": VoiceProviderSpec(
         label="Azure OpenAI",
         default_api_base="",
         auth_style=AUTH_API_KEY_HEADER,
         default_model="tts-1",
-        default_voice="alloy",
     ),
     "vllm": VoiceProviderSpec(
         label="vLLM / Local",
         default_api_base="http://localhost:8000/v1",
         default_model="",
-        default_voice="",
         is_local=True,
     ),
     "custom": VoiceProviderSpec(
         label="OpenAI Compatible",
         default_api_base="",
         default_model="",
-        default_voice="",
     ),
 }
 
@@ -1205,15 +1194,10 @@ def resolve_tts_runtime_config(
     api_key = _as_str((profile or {}).get("api_key"))
     if not api_key and spec.is_local:
         api_key = "sk-no-key-required"
-    from deeptutor.services.voice.options import is_qwen_audio_tts, voice_model_options
+    from deeptutor.services.voice.options import voice_model_options
 
     options = voice_model_options(provider, "tts", resolved_model)
-    default_voice = spec.default_voice
-    if options["voices"]:
-        default_voice = options["voices"][0]["id"]
-    elif provider == "dashscope" and is_qwen_audio_tts(resolved_model):
-        default_voice = ""
-    voice = _as_str((model or {}).get("voice")) or default_voice
+    voice = _as_str((model or {}).get("voice"))
     response_format = _as_str((model or {}).get("response_format")) or options["formats"][0]
     raw_speed = (model or {}).get("speed")
     speed = _coerce_optional_float(raw_speed)

@@ -533,6 +533,14 @@ async def purge_session(session_id: str):
     if not purged:
         raise HTTPException(status_code=404, detail="Session not found in recycle bin")
     await _cleanup_deleted_session(session_id)
+    from deeptutor.services.task_board import get_task_board_store
+    from deeptutor.services.workspace.context import current_workspace_id
+
+    await asyncio.to_thread(
+        get_task_board_store(migrate_legacy=False).remove_session,
+        current_workspace_id(),
+        session_id,
+    )
     return {"purged": True, "session_id": session_id}
 
 

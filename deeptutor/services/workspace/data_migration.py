@@ -32,7 +32,6 @@ FEATURES = {
     "reading": "Immersive Reading",
     "timed_media": "Immersive Watching",
     "notebook": "Notebooks",
-    "task-board": "Task Board",
     "co-writer": "Writing",
     "courses": "Courses",
     "files": "File library",
@@ -675,6 +674,11 @@ def migrate_data(
                         original.unlink()
                     else:
                         shutil.rmtree(original)
+            from deeptutor.services.task_board import get_task_board_store
+
+            get_task_board_store(migrate_legacy=False).move_session_links(
+                plan["session_ids"], source_id, target_id
+            )
             result["status"] = "completed"
             atomic_write_json(journal, result)
             _clear_store_caches()
@@ -966,6 +970,11 @@ def recover_operation(operation_id: str) -> dict:
                         original.unlink()
                     else:
                         shutil.rmtree(original)
+            from deeptutor.services.task_board import get_task_board_store
+
+            get_task_board_store(migrate_legacy=False).move_session_links(
+                plan["session_ids"], plan["source_workspace_id"], plan["target_workspace_id"]
+            )
             result["status"] = "completed"
         else:
             if result["status"] in {"transferring", "recovery_required"}:

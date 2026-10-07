@@ -15,25 +15,66 @@ from deeptutor.services.workspace.models import WorkspaceError
 from tests.services.workspace.test_data_scope import account as account
 
 
-def test_task_board_export_and_migration_preserve_archived_cards(account):
+def test_independent_task_board_is_not_part_of_workspace_data_migration(account):
     from deeptutor.services.task_board import CreateCard, UpdateCard, get_task_board_store
-    from deeptutor.services.workspace.data_migration import export_path
 
     target = account.create_workspace("Destination")["workspace_id"]
     with workspace_context():
         store = get_task_board_store()
         card = store.create(CreateCard(title="Review examples")).cards[0]
         expected = store.update(card.id, UpdateCard(status="done", archived=True))
-    feature = next(row for row in discover()["features"] if row["feature"] == "task-board")
-    assert not feature["error"]
-    exported = export_data("", ["task-board"])
-    with zipfile.ZipFile(export_path(exported["id"])) as archive:
-        assert any(name.endswith("cards.sqlite") for name in archive.namelist())
-    assert migrate_data("", target, ["task-board"])["status"] == "completed"
+    assert "task-board" not in {row["feature"] for row in discover()["features"]}
     with workspace_context(target):
         assert get_task_board_store().read() == expected
     with workspace_context():
-        assert get_task_board_store().read().cards == []
+        assert get_task_board_store().read() == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("interrupt_links", [False, True])
+async def test_conversation_move_preserves_task_links_and_recovers_cleanup(
+    account, monkeypatch, interrupt_links
+):
+    from deeptutor.services.task_board import (
+        CreateCard,
+        LinkStatus,
+        LinkTasks,
+        TaskBoardStore,
+        get_task_board_store,
+    )
+    from deeptutor.services.workspace.data_migration import operations, recover_operation
+    from deeptutor.services.workspace.session_move import move_chat
+
+    target = account.create_workspace("Destination")["workspace_id"]
+    session = await get_sqlite_session_store().create_session("Task conversation")
+    board = get_task_board_store()
+    first = board.create(CreateCard(title="First")).cards[-1]
+    second = board.create(CreateCard(title="Latest")).cards[-1]
+    board.link_tasks(session["id"], LinkTasks(task_ids=[first.id, second.id]))
+    board.link_status(session["id"], LinkStatus(enabled=False))
+    original = TaskBoardStore.move_session_links
+    if interrupt_links:
+
+        def interrupted(*_args, **_kwargs):
+            raise RuntimeError("interrupted task association cleanup")
+
+        monkeypatch.setattr(TaskBoardStore, "move_session_links", interrupted)
+        with pytest.raises(RuntimeError, match="cleanup"):
+            move_chat(session["id"], target)
+        operation = operations()[0]
+        assert operation["status"] == "cleanup_required"
+        monkeypatch.setattr(TaskBoardStore, "move_session_links", original)
+        assert recover_operation(operation["id"])["status"] == "completed"
+    else:
+        move_chat(session["id"], target)
+    links = board.read().session_links
+    assert len(links) == 1
+    assert links[0].workspace_id == target
+    assert links[0].task_ids == [first.id, second.id]
+    assert not links[0].status_link_enabled
+    assert all(card.workspace_id is None for card in board.read().cards)
+    with workspace_context(target):
+        assert await get_sqlite_session_store().get_session(session["id"]) is not None
 
 
 @pytest.mark.asyncio

@@ -155,6 +155,7 @@ class TurnRequestPreparer:
 
             payload = {**payload, "language": get_response_language(default="en")}
         raw_config = dict(payload.get("config", {}) or {})
+        linked_task_ids = raw_config.pop("linked_task_ids", None)
         resource_reuse = raw_config.pop("_resource_reuse", None)
         persistent_kbs = raw_config.pop("_persistent_knowledge_bases", None)
         per_turn_auto_route = payload.get("auto_route")
@@ -173,7 +174,6 @@ class TurnRequestPreparer:
             raise RuntimeError("Conversation not found in this workspace.")
         session = await self.store.ensure_session(payload.get("session_id"))
         preferences = session.get("preferences") or {}
-
         # A conversation-level choice wins over the account default that the
         # browser sends on every turn. Only the selector's explicit field may
         # change or clear this durable override (#1511).
@@ -549,6 +549,12 @@ class TurnRequestPreparer:
                     ],
                 }
         payload = {**payload, "llm_selection": llm_selection}
+        if linked_task_ids is not None:
+            from deeptutor.services.task_board import LinkTasks, get_task_board_store
+            from deeptutor.services.workspace.context import current_workspace_id
+
+            task_links = LinkTasks(workspace_id=current_workspace_id(), task_ids=linked_task_ids)
+            await asyncio.to_thread(get_task_board_store().link_tasks, session["id"], task_links)
         lease = None
         if self.coordinator is not None:
             turn_id = f"turn_{int(time.time() * 1000)}_{uuid.uuid4().hex[:10]}"

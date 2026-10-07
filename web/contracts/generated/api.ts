@@ -1713,7 +1713,7 @@ export interface paths {
     };
     /**
      * List Knowledge Bases
-     * @description List all available knowledge bases with their details.
+     * @description Disk probes must not block the async worker or its other requests (#1711).
      */
     readonly get: operations["list_knowledge_bases_api_knowledge_bases_get"];
     readonly put?: never;
@@ -2686,7 +2686,7 @@ export interface paths {
     };
     /**
      * Health Check
-     * @description Health check endpoint
+     * @description Count registered KBs without constructing/probing the catalog (#1711).
      */
     readonly get: operations["health_check_api_knowledge_bases_health_get"];
     readonly put?: never;
@@ -8292,6 +8292,26 @@ export interface paths {
     readonly patch?: never;
     readonly trace?: never;
   };
+  readonly "/api/settings/services/{service}/preview": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * Preview Service
+     * @description Stream a real result from the selected draft without applying it.
+     */
+    readonly post: operations["preview_service_api_settings_services__service__preview_post"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
   readonly "/api/settings/sidebar": {
     readonly parameters: {
       readonly query?: never;
@@ -8650,6 +8670,26 @@ export interface paths {
      * @description Audition the model being edited without saving or activating its catalog.
      */
     readonly post: operations["preview_voice_api_settings_voice_preview_post"];
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/settings/voice/voices": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    /**
+     * List Voice Choices
+     * @description Read live account voices for a draft selection, without applying it.
+     */
+    readonly post: operations["list_voice_choices_api_settings_voice_voices_post"];
     readonly delete?: never;
     readonly options?: never;
     readonly head?: never;
@@ -9775,10 +9815,7 @@ export interface paths {
       readonly path?: never;
       readonly cookie?: never;
     };
-    /**
-     * Get Board
-     * @description Return active and archived cards in the current workspace.
-     */
+    /** Get Board */
     readonly get: operations["get_board_api_task_board_get"];
     readonly put?: never;
     readonly post?: never;
@@ -9797,10 +9834,7 @@ export interface paths {
     };
     readonly get?: never;
     readonly put?: never;
-    /**
-     * Create Card
-     * @description Create a task in the To do column.
-     */
+    /** Create Card */
     readonly post: operations["create_card_api_task_board_cards_post"];
     readonly delete?: never;
     readonly options?: never;
@@ -9821,11 +9855,76 @@ export interface paths {
     readonly delete?: never;
     readonly options?: never;
     readonly head?: never;
-    /**
-     * Update Card
-     * @description Edit, move, archive or restore an existing task.
-     */
+    /** Update Card */
     readonly patch: operations["update_card_api_task_board_cards__card_id__patch"];
+    readonly trace?: never;
+  };
+  readonly "/api/task-board/colors": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    /** Update Colors */
+    readonly put: operations["update_colors_api_task_board_colors_put"];
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/task-board/events": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    /** Board Events */
+    readonly get: operations["board_events_api_task_board_events_get"];
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/task-board/sessions/{session_id}": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    /** Link Tasks */
+    readonly put: operations["link_tasks_api_task_board_sessions__session_id__put"];
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    readonly patch?: never;
+    readonly trace?: never;
+  };
+  readonly "/api/task-board/sessions/{session_id}/status": {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: never;
+      readonly path?: never;
+      readonly cookie?: never;
+    };
+    readonly get?: never;
+    readonly put?: never;
+    readonly post?: never;
+    readonly delete?: never;
+    readonly options?: never;
+    readonly head?: never;
+    /** Link Status */
+    readonly patch: operations["link_status_api_task_board_sessions__session_id__status_patch"];
     readonly trace?: never;
   };
   readonly "/api/tools": {
@@ -11695,10 +11794,7 @@ export interface components {
        */
       readonly user_intent: string;
     };
-    /**
-     * CreateCard
-     * @description A learner-authored task; identifiers and timestamps are server-owned.
-     */
+    /** CreateCard */
     readonly CreateCard: {
       /**
        * Note
@@ -12980,6 +13076,26 @@ export interface components {
       /** Folder Path */
       readonly folder_path: string;
     };
+    /** LinkStatus */
+    readonly LinkStatus: {
+      /** Enabled */
+      readonly enabled: boolean;
+      /**
+       * Workspace Id
+       * @default
+       */
+      readonly workspace_id: string;
+    };
+    /** LinkTasks */
+    readonly LinkTasks: {
+      /** Task Ids */
+      readonly task_ids: readonly string[];
+      /**
+       * Workspace Id
+       * @default
+       */
+      readonly workspace_id: string;
+    };
     /** ListImaRequest */
     readonly ListImaRequest: {
       /**
@@ -14017,11 +14133,8 @@ export interface components {
     readonly PositionPayload: {
       /** Locator */
       readonly locator: number;
-      /**
-       * Percentage
-       * @default 0
-       */
-      readonly percentage: number;
+      /** Percentage */
+      readonly percentage?: number | null;
       /**
        * Source Anchor
        * @default
@@ -14808,6 +14921,32 @@ export interface components {
         readonly [key: string]: string;
       };
     };
+    /** ServicePreviewPayload */
+    readonly ServicePreviewPayload: {
+      /**
+       * Audio
+       * @default
+       */
+      readonly audio: string;
+      /** Catalog */
+      readonly catalog: {
+        readonly [key: string]: unknown;
+      };
+      /**
+       * Content Type
+       * @default
+       */
+      readonly content_type: string;
+      /** Model Id */
+      readonly model_id?: string | null;
+      /** Profile Id */
+      readonly profile_id: string;
+      /**
+       * Text
+       * @default
+       */
+      readonly text: string;
+    };
     /** SessionBranchBody */
     readonly SessionBranchBody: {
       /** New Key */
@@ -14918,6 +15057,20 @@ export interface components {
        * @default null
        */
       readonly updated_at: number | null;
+    };
+    /** SessionTaskLinks */
+    readonly SessionTaskLinks: {
+      /** Session Id */
+      readonly session_id: string;
+      /**
+       * Status Link Enabled
+       * @default true
+       */
+      readonly status_link_enabled: boolean;
+      /** Task Ids */
+      readonly task_ids?: readonly string[];
+      /** Workspace Id */
+      readonly workspace_id: string;
     };
     /**
      * SetRoleRequest
@@ -15046,6 +15199,24 @@ export interface components {
     readonly SoulUpdateBody: {
       /** Content */
       readonly content: string;
+    };
+    /** StatusColors */
+    readonly StatusColors: {
+      /**
+       * Doing
+       * @default #a16207
+       */
+      readonly doing: string;
+      /**
+       * Done
+       * @default #15803d
+       */
+      readonly done: string;
+      /**
+       * Todo
+       * @default #2563eb
+       */
+      readonly todo: string;
     };
     /** SubagentMessageRequest */
     readonly SubagentMessageRequest: {
@@ -15207,18 +15378,20 @@ export interface components {
       /** Updated */
       readonly updated: number;
     };
-    /**
-     * TaskBoard
-     * @description A consistent snapshot of the current workspace's board.
-     */
+    /** TaskBoard */
     readonly TaskBoard: {
       /** Cards */
       readonly cards: readonly components["schemas"]["TaskCard"][];
+      readonly colors?: components["schemas"]["StatusColors"];
+      /**
+       * Revision
+       * @default 0
+       */
+      readonly revision: number;
+      /** Session Links */
+      readonly session_links?: readonly components["schemas"]["SessionTaskLinks"][];
     };
-    /**
-     * TaskCard
-     * @description Persisted card returned to the board, including archived cards.
-     */
+    /** TaskCard */
     readonly TaskCard: {
       /** Archived */
       readonly archived: boolean;
@@ -15240,6 +15413,8 @@ export interface components {
       readonly title: string;
       /** Updated At */
       readonly updated_at: string;
+      /** Workspace Id */
+      readonly workspace_id?: string | null;
     };
     /** TestResponse */
     readonly TestResponse: {
@@ -15844,10 +16019,7 @@ export interface components {
       /** Title */
       readonly title?: string | null;
     };
-    /**
-     * UpdateCard
-     * @description Only supplied fields change, preserving concurrent edits to other fields.
-     */
+    /** UpdateCard */
     readonly UpdateCard: {
       /** Archived */
       readonly archived?: boolean | null;
@@ -15857,6 +16029,8 @@ export interface components {
       readonly status?: ("todo" | "doing" | "done") | null;
       /** Title */
       readonly title?: string | null;
+      /** Workspace Id */
+      readonly workspace_id?: string | null;
     };
     /** UpdateCourseRequest */
     readonly UpdateCourseRequest: {
@@ -16331,6 +16505,17 @@ export interface components {
     readonly VoiceAutoplayUpdate: {
       /** Voice Autoplay */
       readonly voice_autoplay: boolean;
+    };
+    /** VoiceDiscoveryPayload */
+    readonly VoiceDiscoveryPayload: {
+      /** Catalog */
+      readonly catalog: {
+        readonly [key: string]: unknown;
+      };
+      /** Model Id */
+      readonly model_id: string;
+      /** Profile Id */
+      readonly profile_id: string;
     };
     /** VoiceMathSpeakUpdate */
     readonly VoiceMathSpeakUpdate: {
@@ -16839,6 +17024,8 @@ export type SchemaLightRagVisionModel =
 export type SchemaLinkedFolderInfo = components["schemas"]["LinkedFolderInfo"];
 export type SchemaLinkFolderRequest =
   components["schemas"]["LinkFolderRequest"];
+export type SchemaLinkStatus = components["schemas"]["LinkStatus"];
+export type SchemaLinkTasks = components["schemas"]["LinkTasks"];
 export type SchemaListImaRequest = components["schemas"]["ListImaRequest"];
 export type SchemaListImaResponse = components["schemas"]["ListImaResponse"];
 export type SchemaLlamaIndexConfigUpdate =
@@ -16977,6 +17164,8 @@ export type SchemaRoundSummaryRequest =
 export type SchemaRunStartRequest = components["schemas"]["RunStartRequest"];
 export type SchemaRuntimeStatus = components["schemas"]["RuntimeStatus"];
 export type SchemaServerPayload = components["schemas"]["ServerPayload"];
+export type SchemaServicePreviewPayload =
+  components["schemas"]["ServicePreviewPayload"];
 export type SchemaSessionBranchBody =
   components["schemas"]["SessionBranchBody"];
 export type SchemaSessionDetail = components["schemas"]["SessionDetail"];
@@ -16994,6 +17183,7 @@ export type SchemaSessionRenameRequest =
 export type SchemaSessionReplyLanguageRequest =
   components["schemas"]["SessionReplyLanguageRequest"];
 export type SchemaSessionSummary = components["schemas"]["SessionSummary"];
+export type SchemaSessionTaskLinks = components["schemas"]["SessionTaskLinks"];
 export type SchemaSetRoleRequest = components["schemas"]["SetRoleRequest"];
 export type SchemaSetSessionModeRequest =
   components["schemas"]["SetSessionModeRequest"];
@@ -17018,6 +17208,7 @@ export type SchemaSoulSpec = components["schemas"]["SoulSpec"];
 export type SchemaSoulTemplateUpdateRequest =
   components["schemas"]["SoulTemplateUpdateRequest"];
 export type SchemaSoulUpdateBody = components["schemas"]["SoulUpdateBody"];
+export type SchemaStatusColors = components["schemas"]["StatusColors"];
 export type SchemaSubagentMessageRequest =
   components["schemas"]["SubagentMessageRequest"];
 export type SchemaSubagentSettingsPayload =
@@ -17105,6 +17296,8 @@ export type SchemaVideoLearningSettingsRequest =
   components["schemas"]["VideoLearningSettingsRequest"];
 export type SchemaVoiceAutoplayUpdate =
   components["schemas"]["VoiceAutoplayUpdate"];
+export type SchemaVoiceDiscoveryPayload =
+  components["schemas"]["VoiceDiscoveryPayload"];
 export type SchemaVoiceMathSpeakUpdate =
   components["schemas"]["VoiceMathSpeakUpdate"];
 export type SchemaVoicePreviewPayload =
@@ -35689,6 +35882,45 @@ export interface operations {
       };
     };
   };
+  readonly preview_service_api_settings_services__service__preview_post: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path: {
+        readonly service: string;
+      };
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["ServicePreviewPayload"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   readonly get_sidebar_settings_api_settings_sidebar_get: {
     readonly parameters: {
       readonly query?: never;
@@ -36424,6 +36656,43 @@ export interface operations {
         content: {
           readonly "audio/mpeg": unknown;
           readonly "audio/wav": unknown;
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly list_voice_choices_api_settings_voice_voices_post: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["VoiceDiscoveryPayload"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": unknown;
         };
       };
       /** @description Validation Error */
@@ -38973,6 +39242,154 @@ export interface operations {
     readonly requestBody: {
       readonly content: {
         readonly "application/json": components["schemas"]["UpdateCard"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["TaskBoard"];
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly update_colors_api_task_board_colors_put: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["StatusColors"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["TaskBoard"];
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly board_events_api_task_board_events_get: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path?: never;
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody?: never;
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly link_tasks_api_task_board_sessions__session_id__put: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path: {
+        readonly session_id: string;
+      };
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["LinkTasks"];
+      };
+    };
+    readonly responses: {
+      /** @description Successful Response */
+      readonly 200: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["TaskBoard"];
+        };
+      };
+      /** @description Validation Error */
+      readonly 422: {
+        headers: {
+          readonly [name: string]: unknown;
+        };
+        content: {
+          readonly "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  readonly link_status_api_task_board_sessions__session_id__status_patch: {
+    readonly parameters: {
+      readonly query?: never;
+      readonly header?: {
+        readonly Authorization?: string | null;
+      };
+      readonly path: {
+        readonly session_id: string;
+      };
+      readonly cookie?: {
+        readonly dt_token?: string | null;
+      };
+    };
+    readonly requestBody: {
+      readonly content: {
+        readonly "application/json": components["schemas"]["LinkStatus"];
       };
     };
     readonly responses: {

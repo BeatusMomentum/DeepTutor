@@ -887,6 +887,17 @@ class TurnExecutor:
                     **parent_kwargs,
                 )
 
+            if not selection_tutor_context:
+                from deeptutor.services.task_board import get_task_board_store
+                from deeptutor.services.workspace.context import current_workspace_id
+
+                task_context = await asyncio.to_thread(
+                    get_task_board_store(migrate_legacy=False).context_text,
+                    current_workspace_id(),
+                    session_id,
+                )
+                source_manifest_text += task_context
+
             context = UnifiedContext(
                 session_id=session_id,
                 user_message=effective_user_message,

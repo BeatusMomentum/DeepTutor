@@ -69,7 +69,7 @@ deeptutor run <capability> <message> [options]
 
 | 选项 | 缩写 | 说明 |
 |------|------|------|
-| `--tool` | `-t` | 启用工具（可多次指定）：`rag`, `web_search`, `exec`, `reason`, `brainstorm`, `paper_search`, `geogebra_analysis`, `imagegen`, `videogen` |
+| `--tool` | `-t` | 启用工具（可多次指定）：`web_search`, `reason`, `brainstorm`, `paper_search`, `geogebra_analysis`, `imagegen`, `videogen`；RAG 通过 `--kb` 挂载 |
 | `--kb` | | 挂载知识库 |
 | `--language` | `-l` | 回复语言（默认 `en`） |
 | `--session` | | 继续已有会话 |
@@ -86,7 +86,7 @@ deeptutor run <capability> <message> [options]
 deeptutor run chat "什么是傅里叶变换？" -l zh
 
 # 深度解题
-deeptutor run deep_solve "证明 n^3-n 能被 6 整除" -t rag --kb math-textbook
+deeptutor run deep_solve "证明 n^3-n 能被 6 整除" --kb math-textbook
 
 # 简要回答
 deeptutor run deep_solve "求 sin(x) 的导数" --config detailed_answer=false
@@ -218,8 +218,29 @@ deeptutor plugin info <name>                     # 查看详情
 ### `config` — 配置
 
 ```bash
-deeptutor config show
+deeptutor config show [--home PATH]                # 查看配置（隐藏凭据）
+deeptutor config providers                         # JSON：支持的提供方和默认端点
+deeptutor config apply setup.json --check          # 无写入、无网络请求的预校验
+deeptutor config apply setup.json [--home PATH]    # 无交互应用配置
 ```
+
+让外部 Agent 配置 DeepTutor 时，先阅读根目录的 [SKILL.md](../SKILL.md)，再按
+[Agent Setup 指南](../docs-for-user/AGENT_SETUP.md) 完成安装、配置、启动和验证。
+`deeptutor init --non-interactive [--home PATH]` 只创建缺失的默认设置，不询问参数、
+不选择模型，也不会覆盖已有设置。CLI-only 可以同时加 `--cli`。
+
+`config apply` 接受 JSON 中的 `llm`、`embedding`、`search`、`system` 配置段；
+具体字段见指南。通过 `api_key_env` 引用进程环境中的凭据，不接受明文 `api_key`。
+它会更新并选中对应服务的 Agent Setup profile，保留其他 profile 和未提供的设置，
+重复应用不会创建重复 profile。校验和应用都输出 JSON，参数错误退出码为 2。
+所有步骤应使用同一个 `DEEPTUTOR_HOME`；根目录 `.env` 不会自动加载。
+
+```bash
+deeptutor doctor --format json                     # 本地就绪检查
+deeptutor doctor --online --format json            # 发送一次小型 LLM 请求验证连接
+```
+
+在线检查会产生提供方用量，只验证 LLM；需要 RAG 时还要验证 embedding 和小样本文档检索。
 
 ### `provider` — 提供方认证 / 校验
 
@@ -260,7 +281,7 @@ Codex 令牌授权的是**你本人**的 ChatGPT 套餐，因此凭据只归当�
 deeptutor kb create calculus --doc 微积分教材.pdf
 
 # 2. 用知识库解题
-deeptutor run deep_solve "求 ∫sin(x)cos(x)dx" -t rag --kb calculus -l zh
+deeptutor run deep_solve "求 ∫sin(x)cos(x)dx" --kb calculus -l zh
 
 # 3. 基于知识库出题
 deeptutor run deep_question "微积分" --kb calculus \

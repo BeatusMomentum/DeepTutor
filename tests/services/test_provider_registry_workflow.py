@@ -381,7 +381,10 @@ def test_capability_detection_uses_metadata_not_names():
                 "architecture": {"input_modalities": ["text"], "output_modalities": ["image"]},
             }
         ]
-    ) == [{"category": "generation", "evidence": "metadata"}]
+    ) == [
+        {"category": "generation", "evidence": "metadata"},
+        {"category": "imagegen", "evidence": "metadata"},
+    ]
     assert detect_capabilities(
         [
             {"supportedGenerationMethods": ["embedContent"]},
@@ -492,3 +495,45 @@ def test_managed_account_and_model_names_survive_catalog_refresh(tmp_path):
     )
     assert managed["name"] == "My signed-in account"
     assert managed["models"][0]["name"] == "My model label"
+
+
+@pytest.mark.parametrize("link", ["reference", "legacy_connection"])
+def test_manual_service_adapter_and_url_survive_save_and_reach_runtime(tmp_path, link):
+    store, catalog = fixture(tmp_path)
+    overrides = {
+        "tts": {"enabled": True, "binding": "minimax", "base_url": "https://speech.test/v1"}
+    }
+    catalog = merge_registry_edit(catalog, provider_edit(service_overrides=overrides))
+    profile = catalog["services"]["tts"]["profiles"][0]
+    if link == "reference":
+        profile["provider_ref"] = {"connection_id": "account", "binding": "custom"}
+    else:
+        profile["connection_id"] = "account"
+    saved = store.save(catalog)
+    source = next(c for c in saved["connections"] if c["id"] == "account")
+    assert source["service_overrides"] == overrides
+    resolved = resolve_profile_provider(saved, "tts", saved["services"]["tts"]["profiles"][0])
+    assert resolved["binding"] == "minimax"
+    assert resolved["base_url"] == "https://speech.test/v1"
+    assert resolved["api_key"] == "new-secret"
+
+
+def test_manual_service_changes_do_not_rekey_or_remove_existing_models(tmp_path):
+    store, catalog = fixture(tmp_path)
+    before = deepcopy(catalog["services"])
+    catalog = merge_registry_edit(
+        catalog,
+        {
+            "kind": "provider",
+            "ref": {"service": "llm", "profile_id": "llm"},
+            "fields": {
+                "service_overrides": {
+                    "llm": {"enabled": False},
+                    "tts": {"enabled": True, "binding": "custom"},
+                }
+            },
+        },
+    )
+    saved = store.save(catalog)
+    saved["services"]["llm"]["profiles"][0].pop("service_overrides")
+    assert saved["services"] == before

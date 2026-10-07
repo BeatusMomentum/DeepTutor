@@ -116,12 +116,14 @@ export function RegistryProbe({
   onResult,
   listing = false,
   hints = [],
+  showCapabilities = true,
 }: {
   input: ProviderProbeInput;
   discovery?: Discovery;
   onResult: (result: Discovery) => void;
   listing?: boolean;
   hints?: string[];
+  showCapabilities?: boolean;
 }) {
   // Credentials are only an in-memory request signature, never rendered or persisted.
   return (
@@ -132,6 +134,7 @@ export function RegistryProbe({
       onResult={onResult}
       listing={listing}
       hints={hints}
+      showCapabilities={showCapabilities}
     />
   );
 }
@@ -141,23 +144,26 @@ function ProbeForm({
   onResult,
   listing,
   hints,
+  showCapabilities,
 }: {
   input: ProviderProbeInput;
   discovery?: Discovery;
   onResult: (result: Discovery) => void;
   listing: boolean;
   hints: string[];
+  showCapabilities: boolean;
 }) {
   const { t } = useTranslation();
   const [result, setResult] = useState(discovery);
   const [pending, setPending] = useState(false);
   const controller = useRef<AbortController | null>(null);
-  useEffect(() => () => controller.current?.abort(), []);
+  useEffect(() => () => { controller.current?.abort(); controller.current = null; }, []);
   const probe = async () => {
     controller.current?.abort();
     const request = new AbortController();
     controller.current = request;
     setPending(true);
+    const timeout = setTimeout(() => request.abort(), 35000);
     try {
       const response = await apiFetch(apiUrl("/api/settings/test-provider"), {
         method: "POST",
@@ -173,10 +179,14 @@ function ProbeForm({
       setResult(next);
       onResult(next);
     } catch {
-      if (!request.signal.aborted)
-        setResult({ status: "unreachable", models: [] });
+      if (controller.current === request) {
+        const failed: Discovery = { status: request.signal.aborted ? "timeout" : "unreachable", models: [], checked_at: new Date().toISOString() };
+        setResult(failed);
+        onResult(failed);
+      }
     } finally {
-      if (!request.signal.aborted) setPending(false);
+      clearTimeout(timeout);
+      if (controller.current === request) setPending(false);
     }
   };
   return (
@@ -215,7 +225,8 @@ function ProbeForm({
           role="status"
           className={`text-xs leading-relaxed ${result.status === "connected" ? "text-emerald-700 dark:text-emerald-400" : "text-[var(--muted-foreground)]"}`}
         >
-          {t(PROBE_MESSAGES[result.status] || PROBE_MESSAGES.http_error)}
+          {t(result.status === "connected" && input.service !== "search" ? "settings.providerServices.catalogListed" : PROBE_MESSAGES[result.status] || PROBE_MESSAGES.http_error)}
+          {result.warning === "partial_models" && <p className="mt-2">{t("settings.providerServices.partial")}</p>}
           {result.http_status != null && ` · HTTP ${result.http_status}`}
           {result.warning === "empty_results" && (
             <p className="mt-2">
@@ -232,7 +243,7 @@ function ProbeForm({
             ` · ${t("{{count}} models available", { count: result.models.length })}`}
         </div>
       )}
-      {!listing && (
+      {!listing && showCapabilities && (
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {CATEGORIES.map((label, i) => {

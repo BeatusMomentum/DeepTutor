@@ -19,6 +19,9 @@ import {
   providerProbeInput,
   updateProvider,
   REGISTRY_SERVICES,
+  SERVICE_TITLES,
+  PROVIDER_SERVICES,
+  providerServiceSupport,
 } from "@/lib/provider-registry";
 import {
   EditableRegistryName,
@@ -28,9 +31,11 @@ import {
   registryDanger,
   registryPrimary,
 } from "./RegistryControls";
+import { ProviderServices } from "./ProviderServices";
+import { AddProviderPanel, ProviderProtocol, type CustomProviderInput } from "./AddProviderPanel";
 import { CodexOAuthCard } from "./CodexOAuthCard";
 import { CodeBuddyAuthCard } from "./CodeBuddyAuthCard";
-import { selectClass, stringifyExtraHeaders, subPanelClass } from "./shared";
+import { stringifyExtraHeaders, subPanelClass } from "./shared";
 import {
   WorkspaceDetailEmpty,
   WorkspaceRail,
@@ -82,13 +87,14 @@ export function ProvidersWorkspace() {
   }, [sources.length]);
   const options = [
     ...new Map(
-      REGISTRY_SERVICES.flatMap((service) =>
-        (providers[service] ?? [])
-          .filter((p) => p.value !== "none" && p.status !== "deprecated")
-          .map((option) => [option.value, { ...option, service }] as const),
-      ).reverse(),
+      REGISTRY_SERVICES.flatMap((service) => (providers[service] ?? [])
+        .filter(p => p.value !== "none" && p.status !== "deprecated")
+        .map(option => [option.value, { ...option, service }] as const)).reverse(),
     ).values(),
-  ].sort((a, b) => a.label.localeCompare(b.label));
+  ].map(option => ({ ...option, services: PROVIDER_SERVICES.filter(service =>
+    providers[service]?.some(p => p.value === option.value && p.status !== "deprecated") ||
+    Boolean(connectionTargets.find(target => target.provider === option.value)?.services[service]))
+  })).sort((a, b) => a.label.localeCompare(b.label));
   const source = sources.find((p) => p.id === selected);
   const option = options.find((p) => p.value === source?.provider);
   const managed = source?.provider === "openai_codex";
@@ -101,7 +107,7 @@ export function ProvidersWorkspace() {
           updateProvider(next, source.ref, "user_name", value);
       });
   };
-  const create = () => {
+  const create = (custom?: CustomProviderInput) => {
     const option = options.find((o) => o.value === vendor);
     if (!option) return;
     if (option.value === "openai_codex") {
@@ -112,13 +118,15 @@ export function ProvidersWorkspace() {
     const id = `conn-${randomUuid()}`;
     const entry: CatalogConnection = {
       id,
-      name: option.label,
+      name: custom?.name || option.label,
       provider: option.value,
       source_service: option.service,
       api_key: "",
-      base_url: "",
+      base_url: custom?.base_url || "",
       api_version: "",
+      ...(custom ? { service_overrides: { llm: { enabled: true, binding: "custom" } } } : {}),
       api_format:
+        custom?.api_format ||
         (option.default_api_format as CatalogConnection["api_format"]) ||
         "auto",
     };
@@ -140,26 +148,8 @@ export function ProvidersWorkspace() {
   const filtered = sources.filter((p) =>
     `${p.name} ${p.provider}`.toLowerCase().includes(query.toLowerCase()),
   );
-  const hints = source
-    ? Object.keys(
-        connectionTargets.find((target) => target.provider === source.provider)
-          ?.services ?? {},
-      ).map((service) =>
-        ["tts", "stt"].includes(service)
-          ? "voice"
-          : ["imagegen", "videogen"].includes(service)
-            ? "generation"
-            : service,
-      )
-    : [];
-  if (
-    source &&
-    (providers.search ?? []).some(
-      (p) => p.value === source.provider && p.status !== "deprecated",
-    )
-  )
-    hints.push("search");
-  if (source && ["tts", "stt"].some(service => providers[service as "tts" | "stt"]?.some(p => p.value === source.provider))) hints.push("voice");
+  const hints = source ? PROVIDER_SERVICES.filter(service => providerServiceSupport(source, service, connectionTargets, providers).enabled)
+    .map(service => ["tts", "stt"].includes(service) ? "voice" : ["imagegen", "videogen"].includes(service) ? "generation" : service) : [];
   return (
     <div className="space-y-5">
       <WorkspaceSplit
@@ -219,6 +209,9 @@ export function ProvidersWorkspace() {
                       count: providerUsage(draft, p),
                     })}
                     {!savedIds.has(p.id) && ` · ${t("Not saved")}`}
+                  </span>
+                  <span className="mt-2 flex flex-wrap gap-1 pl-6">
+                    {PROVIDER_SERVICES.filter(service => providerServiceSupport(p, service, connectionTargets, providers).enabled).map(service => <span key={service} className="rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]">{t(SERVICE_TITLES[service])}</span>)}
                   </span>
                 </button>
               );
@@ -327,33 +320,14 @@ export function ProvidersWorkspace() {
                           </p>
                         </div>
                       )}
+                      {providerServiceSupport(source, "llm", connectionTargets, providers).enabled && <ProviderProtocol value={connection.api_format || "auto"} onChange={value => change("api_format", value)} />}
+                      <ProviderServices key={source.id} source={source} onChange={value => change("service_overrides", value)} />
                       <details className={`p-3.5 ${subPanelClass}`}>
                         <summary className="cursor-pointer select-none rounded text-xs font-medium marker:text-[var(--muted-foreground)]">
                           {t("Advanced connection settings")}
                         </summary>
                         <div className="mt-4 grid gap-4 sm:grid-cols-2">
                           {source.provider !== "volcengine_speech" && <>
-                          <label className="block space-y-1.5 text-xs font-medium">
-                            <span className="block">{t("API format")}</span>
-                            <select
-                              className={selectClass}
-                              value={connection.api_format || "auto"}
-                              onChange={(e) =>
-                                change("api_format", e.target.value)
-                              }
-                            >
-                              <option value="auto">{t("Auto")}</option>
-                              <option value="openai_chat">
-                                {t("OpenAI Chat Completions")}
-                              </option>
-                              <option value="openai_responses">
-                                {t("OpenAI Responses")}
-                              </option>
-                              <option value="anthropic">
-                                {t("Anthropic Messages")}
-                              </option>
-                            </select>
-                          </label>
                           <RegistryField
                             label={t("API version")}
                             value={connection.api_version || ""}
@@ -382,6 +356,7 @@ export function ProvidersWorkspace() {
                         input={providerProbeInput(source, option?.base_url)}
                         discovery={connection.discovery}
                         hints={hints}
+                        showCapabilities={false}
                         onResult={(result) => change("discovery", result)}
                       />
                     </>
@@ -418,7 +393,10 @@ export function ProvidersWorkspace() {
                         ["search", "Search"],
                         ["voice", "Voice"],
                         ["multimodal", "Multimodal generation"],
-                      ].map(([path, label]) => (
+                      ].filter(([path]) => PROVIDER_SERVICES.some(service =>
+                        (path === "voice" ? service === "tts" || service === "stt" : path === "multimodal" ? service === "imagegen" || service === "videogen" : service === path) &&
+                        providerServiceSupport(source, service, connectionTargets, providers).enabled
+                      )).map(([path, label]) => (
                         <Link
                           key={path}
                           href={`/settings/${path}?provider=${encodeURIComponent(source.id)}`}
@@ -445,66 +423,5 @@ export function ProvidersWorkspace() {
         }
       />
     </div>
-  );
-}
-
-/**
- * The add flow. It lives in the detail pane, opposite the list, because that is
- * the one place on the page that means "what you are configuring right now" —
- * and only one thing can be there at a time.
- */
-function AddProviderPanel({
-  options,
-  vendor,
-  onVendor,
-  onCreate,
-  onCancel,
-}: {
-  options: { value: string; label: string }[];
-  vendor: string;
-  onVendor: (value: string) => void;
-  onCreate: () => void;
-  onCancel: () => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <section
-      aria-label={t("Add provider")}
-      className={`min-w-0 p-5 ${subPanelClass}`}
-    >
-      <h3 className="mb-4 text-base font-semibold">{t("Add provider")}</h3>
-      <label className="block space-y-1.5 text-xs font-medium sm:max-w-sm">
-        <span className="block">{t("Provider type")}</span>
-        <select
-          aria-label={t("Provider type")}
-          className={selectClass}
-          value={vendor}
-          onChange={(e) => onVendor(e.target.value)}
-        >
-          <option value="">{t("Choose a provider")}</option>
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <p className="mt-3 text-xs leading-relaxed text-[var(--muted-foreground)]">
-        {t("Connect once. Reuse the provider across your models.")}
-      </p>
-      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[color-mix(in_srgb,var(--border)_70%,transparent)] pt-4">
-        <button
-          type="button"
-          disabled={!vendor}
-          onClick={onCreate}
-          className={registryPrimary}
-        >
-          {t("Continue")}
-        </button>
-        <button type="button" onClick={onCancel} className={registryButton}>
-          {t("Cancel")}
-        </button>
-      </div>
-    </section>
   );
 }

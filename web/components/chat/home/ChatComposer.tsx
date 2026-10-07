@@ -74,6 +74,10 @@ import ResourceSelector from "./ResourceSelector";
 import type { ComposerResourceCatalog } from "@/hooks/useComposerResources";
 import type { ResourceSelection } from "@/features/chat/ChatStateAdapter";
 
+import TaskLinkSelector from "@/components/tasks/TaskLinkSelector";
+import { useTaskBoard } from "@/lib/task-board-store";
+import { sessionTaskLinks } from "@/lib/task-board-api";
+
 type SpaceSelectionCounts = {
   attachments: number;
   knowledge: number;
@@ -190,6 +194,10 @@ const SEND_STATE_CLASS: Record<SendState, string> = {
 };
 
 export default memo(function ChatComposer({
+  taskSessionId,
+  draftTaskIds = [],
+  onDraftTaskIdsChange,
+  onTasksLinked,
   composerRef,
   capMenuRef,
   capBtnRef,
@@ -296,6 +304,10 @@ export default memo(function ChatComposer({
   inputHeader,
   showCapabilityChip = true,
 }: {
+  taskSessionId?: string | null;
+  draftTaskIds?: string[];
+  onDraftTaskIdsChange?: (ids: string[]) => void;
+  onTasksLinked?: () => void;
   composerRef: RefObject<HTMLDivElement | null>;
   capMenuRef: RefObject<HTMLDivElement | null>;
   capBtnRef: RefObject<HTMLButtonElement | null>;
@@ -702,7 +714,21 @@ export default memo(function ChatComposer({
     [focusTextarea, onSend],
   );
 
+  const { board: taskBoard } = useTaskBoard();
+  const linkedTaskIds = taskSessionId
+    ? sessionTaskLinks(taskBoard, taskSessionId, workspaceId ?? "")?.task_ids ?? []
+    : draftTaskIds;
+  const taskPanelPending = useRef(false);
+  useEffect(() => {
+    // Let users finish selecting tasks before the viewer changes the layout.
+    if (taskPanelPending.current && !spaceMenuOpen && !personaSelectorOpen) {
+      taskPanelPending.current = false;
+      onTasksLinked?.();
+    }
+  }, [spaceMenuOpen, personaSelectorOpen, onTasksLinked]);
+
   const hasReferences =
+    !!linkedTaskIds.length ||
     !!attachments.length ||
     !!selectedBookReferences.length ||
     !!selectedReadingReferences.length ||
@@ -883,6 +909,27 @@ export default memo(function ChatComposer({
   const selectedSkills = resourceSelection?.skills ?? [];
   const selectedMcp = resourceSelection?.mcp ?? [];
   const resourceItems: ComposerResourceItem[] = [];
+  if (taskSessionId || onDraftTaskIdsChange) {
+    resourceItems.push({
+      key: "tasks",
+      group: "Reference materials",
+      label: t("tasks.linked"),
+      icon: ClipboardList,
+      count: linkedTaskIds.length,
+      summary: linkedTaskIds.length ? `${linkedTaskIds.length} ${t("selected")}` : undefined,
+      node: (
+        <TaskLinkSelector
+          sessionId={taskSessionId}
+          workspaceId={workspaceId ?? ""}
+          draftTaskIds={draftTaskIds}
+          onDraftChange={onDraftTaskIdsChange}
+          onLinked={() => {
+            taskPanelPending.current = true;
+          }}
+        />
+      ),
+    });
+  }
   if (knowledgeBases.length > 0) {
     resourceItems.push({
       key: "knowledge",
@@ -1019,7 +1066,7 @@ export default memo(function ChatComposer({
   return (
     <div
       ref={composerRef}
-      className={`relative z-20 mx-auto w-full shrink-0 px-6 pb-5 ${hasMessages ? "pt-1 max-w-[960px]" : "max-w-[768px]"}`}
+      className={`relative ${spaceMenuOpen || personaSelectorOpen ? "z-[61]" : "z-20"} mx-auto w-full shrink-0 px-6 pb-5 ${hasMessages ? "pt-1 max-w-[960px]" : "max-w-[768px]"}`}
       style={{
         transition: "max-width 650ms cubic-bezier(0.16, 1, 0.3, 1)",
       }}

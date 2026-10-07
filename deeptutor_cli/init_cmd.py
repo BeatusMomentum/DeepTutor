@@ -16,8 +16,6 @@ from typing import Any
 from rich.console import Console
 import typer
 
-from deeptutor.runtime.home import DEEPTUTOR_HOME_ENV, get_runtime_home
-
 from . import init_wizard as wiz
 
 
@@ -46,6 +44,21 @@ def _reset_runtime_singletons() -> None:
         ModelCatalogService._instances.clear()
     except Exception:
         pass
+    # Multi-user paths can be imported by the CLI before --home is processed.
+    # Their admin/global settings roots must follow the selected runtime too.
+    import sys
+
+    paths = sys.modules.get("deeptutor.multi_user.paths")
+    if paths is not None:
+        from deeptutor.runtime.home import get_runtime_home
+
+        paths.PROJECT_ROOT = get_runtime_home()
+        paths.ADMIN_WORKSPACE_ROOT = paths.PROJECT_ROOT / "data"
+        paths.USERS_ROOT = paths.ADMIN_WORKSPACE_ROOT / "users"
+        paths.SYSTEM_ROOT = paths.ADMIN_WORKSPACE_ROOT / "system"
+        paths.LEGACY_MULTI_USER_ROOT = paths.PROJECT_ROOT / "multi-user"
+        paths._path_services.clear()
+        paths._legacy_migration_done = False
 
 
 def _ensure_model_service(catalog: dict, service_name: str, profile_id: str, model_id: str):
@@ -409,19 +422,36 @@ def _ensure_search_service(catalog: dict, profile_id: str) -> dict:
     return profile
 
 
-def run_init(*, cli_only: bool = False, home: str | Path | None = None) -> None:
-    runtime_home = get_runtime_home(home)
-    runtime_home.mkdir(parents=True, exist_ok=True)
-    import os
+def run_init(
+    *, cli_only: bool = False, home: str | Path | None = None, non_interactive: bool = False
+) -> None:
+    from .setup_config import select_runtime_home
 
-    os.environ[DEEPTUTOR_HOME_ENV] = str(runtime_home)
-    _reset_runtime_singletons()
+    runtime_home = select_runtime_home(home)
+    runtime_home.mkdir(parents=True, exist_ok=True)
 
     from deeptutor.runtime.banner import labels_for, print_banner, resolve_language
     from deeptutor.services.config import get_model_catalog_service, get_runtime_settings_service
     from deeptutor.services.setup import init_user_directories
 
     init_user_directories(runtime_home)
+
+    if non_interactive:
+        import json
+
+        get_runtime_settings_service().ensure_defaults()
+        get_model_catalog_service().load()
+        Console().print_json(
+            json.dumps(
+                {
+                    "ok": True,
+                    "status": "initialized",
+                    "runtime_home": str(runtime_home),
+                    "next_step": "deeptutor config apply setup.json",
+                }
+            )
+        )
+        return
 
     language = resolve_language()
     strings = labels_for(language)
@@ -543,7 +573,12 @@ def register(app: typer.Typer) -> None:
     def init_command(
         cli: bool = typer.Option(False, "--cli", help="Initialize for CLI-only use."),
         home: Path | None = typer.Option(None, "--home", help="Runtime workspace root."),
+        non_interactive: bool = typer.Option(
+            False,
+            "--non-interactive",
+            help="Create missing defaults without prompts; preserves saved settings.",
+        ),
     ) -> None:
         """Create or update data/user/settings for this workspace."""
 
-        run_init(cli_only=cli, home=home)
+        run_init(cli_only=cli, home=home, non_interactive=non_interactive)

@@ -20,6 +20,7 @@ PROVIDER_FIELDS = (
     *CREDENTIAL_FIELDS,
     "discovery",
     "source_service",
+    "service_overrides",
     "user_name",
 )
 
@@ -110,26 +111,61 @@ def resolve_profile_provider(
 ) -> dict:
     ref = (model or {}).get("provider_ref") or profile.get("provider_ref")
     if not isinstance(ref, dict):
-        return profile
+        overrides = profile.get("service_overrides")
+        override = (
+            overrides.get("llm" if service == "task" else service)
+            if isinstance(overrides, dict)
+            else None
+        )
+        if not isinstance(override, dict) or not override.get("enabled"):
+            return profile
+        result = deepcopy(profile)
+        if override.get("binding"):
+            result["provider" if service == "search" else "binding"] = override["binding"]
+        if override.get("base_url"):
+            result["base_url"] = override["base_url"]
+        return result
     source, source_service = provider_source(catalog, ref)
     result = deepcopy(profile)
-    binding = ref.get("binding") or source.get("binding") or source.get("provider") or "custom"
+    overrides = source.get("service_overrides")
+    override = (
+        overrides.get("llm" if service == "task" else service, {})
+        if isinstance(overrides, dict)
+        else {}
+    )
+    if not isinstance(override, dict) or not override.get("enabled"):
+        override = {}
+    binding = (
+        override.get("binding")
+        or ref.get("binding")
+        or source.get("binding")
+        or source.get("provider")
+        or "custom"
+    )
     result["provider" if service == "search" else "binding"] = binding
     for field in CREDENTIAL_FIELDS:
         result[field] = deepcopy(source.get(field, {} if field == "extra_headers" else ""))
     # An empty provider URL deliberately uses the service's registry default.
     source_url = str(source.get("base_url") or "")
+    target_default = (
+        _source_default_url({"binding": binding}, service)
+        if override.get("binding") and binding != ref.get("binding")
+        else ref.get("default_base_url", "")
+    )
     result["base_url"] = (
         provider_endpoint(source_url, source_service, service, binding)
         if source_url
-        else ref.get("default_base_url", "")
+        else target_default
     )
     uses_default = not source_url
-    if source_url and source_service != service and ref.get("default_base_url"):
+    if source_url and source_service != service and target_default:
         default = _source_default_url(source, source_service)
         if default and source_url.rstrip("/") == default.rstrip("/"):
-            result["base_url"] = ref["default_base_url"]
+            result["base_url"] = target_default
             uses_default = True
+    if override.get("base_url"):
+        result["base_url"] = str(override["base_url"])
+        uses_default = False
     if service == "embedding":
         from .embedding_endpoint import normalize_embedding_endpoint_for_display
 

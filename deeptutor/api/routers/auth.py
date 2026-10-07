@@ -496,7 +496,9 @@ def _install_request_workspace(request) -> None:
         catalog_management = library_request.get() or path.startswith(
             ("/api/skills", "/api/space/mcp")
         )
-        management = path.startswith(("/api/settings", "/api/auth", "/api/multi-user"))
+        management = path.startswith(
+            ("/api/settings", "/api/auth", "/api/multi-user", "/api/task-board")
+        )
         selected = install_workspace_scope(
             None if management or catalog_management else header if header is not None else query
         )
@@ -515,7 +517,10 @@ def _install_request_workspace(request) -> None:
         ):
             raise WorkspaceError("Restore this workspace before changing its data.")
         # Management/migration requests acquire their own exclusive lease.
-        if getattr(request, "method", None) is not None and not management:
+        task_board_request = path == "/api/task-board" or path.startswith("/api/task-board/")
+        if getattr(request, "method", None) is not None and (
+            not management or (task_board_request and path != "/api/task-board/events")
+        ):
             from deeptutor.services.workspace.activity import acquire_activity
 
             state = getattr(request, "state", None)

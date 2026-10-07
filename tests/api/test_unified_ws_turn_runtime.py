@@ -24,7 +24,13 @@ def _fake_skill_service() -> SimpleNamespace:
 
 
 @pytest.fixture(autouse=True)
-def _isolate_runtime_services(monkeypatch):
+def _isolate_runtime_services(monkeypatch, tmp_path):
+    from deeptutor.services.task_board import TaskBoardStore
+
+    board = TaskBoardStore(tmp_path / "tasks.sqlite")
+    monkeypatch.setattr(
+        "deeptutor.services.task_board.get_task_board_store", lambda **_kwargs: board
+    )
     # Runtime now resolves multiple skill libraries; these turn tests use an
     # empty catalog and must not inspect the developer's real skill folders.
     monkeypatch.setattr(
@@ -106,6 +112,17 @@ async def test_turn_runtime_replays_events_and_materializes_messages(
 ) -> None:
     store = SQLiteSessionStore(tmp_path / "chat_history.db")
     runtime = TurnRuntimeManager(store)
+    from deeptutor.services.task_board import CreateCard, UpdateCard, get_task_board_store
+
+    board = get_task_board_store()
+    assigned = board.create(CreateCard(title="Shared workspace task")).cards[-1]
+    board.update(assigned.id, UpdateCard(workspace_id=""))
+    linked = board.create(CreateCard(title="Conversation task")).cards[-1]
+    requested = consultation.get("config", consultation)
+    consultation = {
+        **consultation,
+        "config": {**consultation.get("config", {}), "linked_task_ids": [linked.id]},
+    }
     captured: dict[str, object] = {}
     publish_order: list[str] = []
     original_publish = runtime._publish_live_event
@@ -153,6 +170,7 @@ async def test_turn_runtime_replays_events_and_materializes_messages(
             captured["partner_discussion_group_id"] = context.runtime.partner_discussion_group_id
             assert "consult_partner_id" not in context.config_overrides
             assert "partner_discussion_group_id" not in context.config_overrides
+            assert "linked_task_ids" not in context.config_overrides
             captured["user_message"] = context.user_message
             captured["metadata"] = context.metadata
             captured["source_manifest"] = context.source_manifest
@@ -228,7 +246,6 @@ async def test_turn_runtime_replays_events_and_materializes_messages(
     ]
     done_event = next(e for e in events if e["type"] == "done")
     assert done_event["metadata"]["status"] == "completed"
-    requested = consultation.get("config", consultation)
     assert captured["consult_partner_id"] == requested.get("consult_partner_id")
     assert captured["partner_discussion_group_id"] == requested.get("partner_discussion_group_id")
 
@@ -265,6 +282,9 @@ async def test_turn_runtime_replays_events_and_materializes_messages(
     # surfaces in ``context.source_manifest`` and ``metadata.source_index``.
     assert str(captured["user_message"]) == "hello, i'm frank"
     manifest = str(captured.get("source_manifest") or "")
+    assert "Shared workspace task" in manifest
+    assert "Conversation task" in manifest
+    assert board.read().session_links[0].task_ids == [linked.id]
     assert "[Attached Sources]" in manifest
     # Book source id is now per-book (``bk-{book_id}``) so multi-book
     # sessions can read_source each independently. The mocked book has id

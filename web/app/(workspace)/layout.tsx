@@ -1,3 +1,4 @@
+import TaskBoardRuntime from "@/components/tasks/TaskBoardRuntime";
 import WorkspaceSidebar from "@/components/sidebar/WorkspaceSidebar";
 import AppShell from "@/components/layout/AppShell";
 import { CapabilityAccessProvider } from "@/components/access/CapabilityAccessContext";
@@ -14,23 +15,25 @@ export default function WorkspaceLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <CapabilityAccessProvider>
-      <Suspense>
-      <WorkspaceRuntimeBoundary>
-      <ChatRuntimeProvider>
-        {/* Above the page on purpose: sending the first message navigates
+    <TaskBoardRuntime>
+      <CapabilityAccessProvider>
+        <Suspense>
+          <WorkspaceRuntimeBoundary>
+            <ChatRuntimeProvider>
+              {/* Above the page on purpose: sending the first message navigates
             /chat → /chat/<id>, which remounts the page. The open document
             must not die with it. */}
-        <ReadingProvider>
-          <WatchingProvider>
-            <AppShell sidebar={<WorkspaceSidebar />}>
-              <CapabilityGate>{children}</CapabilityGate>
-            </AppShell>
-          </WatchingProvider>
-        </ReadingProvider>
-      </ChatRuntimeProvider>
-      </WorkspaceRuntimeBoundary>
-      </Suspense>
-    </CapabilityAccessProvider>
+              <ReadingProvider>
+                <WatchingProvider>
+                  <AppShell sidebar={<WorkspaceSidebar />}>
+                    <CapabilityGate>{children}</CapabilityGate>
+                  </AppShell>
+                </WatchingProvider>
+              </ReadingProvider>
+            </ChatRuntimeProvider>
+          </WorkspaceRuntimeBoundary>
+        </Suspense>
+      </CapabilityAccessProvider>
+    </TaskBoardRuntime>
   );
 }

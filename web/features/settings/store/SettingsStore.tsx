@@ -1004,7 +1004,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
               : {}),
             ...(service === "tts"
               ? {
-                  voice: providerOption?.default_voice ?? "",
+                  voice: "",
                   response_format: "",
                 }
               : {}),
@@ -1069,7 +1069,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             : {}),
           ...(service === "tts"
             ? {
-                voice: providerOption?.default_voice ?? "",
+                voice: "",
                 response_format: "",
               }
             : {}),
@@ -1244,7 +1244,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
                   : {}),
                 ...(item.service === "tts"
                   ? {
-                      voice: item.spec.default_voice || "",
+                      voice: "",
                       response_format: "",
                     }
                   : {}),

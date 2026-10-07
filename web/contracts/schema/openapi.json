@@ -2332,7 +2332,6 @@
       },
       "CreateCard": {
         "additionalProperties": false,
-        "description": "A learner-authored task; identifiers and timestamps are server-owned.",
         "properties": {
           "note": {
             "default": "",
@@ -5266,6 +5265,50 @@
         "title": "LinkFolderRequest",
         "type": "object"
       },
+      "LinkStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "workspace_id": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "LinkStatus",
+        "type": "object"
+      },
+      "LinkTasks": {
+        "additionalProperties": false,
+        "properties": {
+          "task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Task Ids",
+            "type": "array"
+          },
+          "workspace_id": {
+            "default": "",
+            "maxLength": 200,
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_ids"
+        ],
+        "title": "LinkTasks",
+        "type": "object"
+      },
       "LinkedFolderInfo": {
         "description": "Response model for linked folder information.",
         "properties": {
@@ -7188,8 +7231,6 @@
           },
           "percentage": {
             "default": 0.0,
-            "maximum": 1.0,
-            "minimum": 0.0,
             "title": "Percentage",
             "type": "number"
           },
@@ -7219,11 +7260,17 @@
             "type": "integer"
           },
           "percentage": {
-            "default": 0.0,
-            "maximum": 1.0,
-            "minimum": 0.0,
-            "title": "Percentage",
-            "type": "number"
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentage"
           },
           "source_anchor": {
             "default": "",
@@ -8923,6 +8970,53 @@
         "title": "ServerPayload",
         "type": "object"
       },
+      "ServicePreviewPayload": {
+        "properties": {
+          "audio": {
+            "default": "",
+            "maxLength": 11184812,
+            "title": "Audio",
+            "type": "string"
+          },
+          "catalog": {
+            "additionalProperties": true,
+            "title": "Catalog",
+            "type": "object"
+          },
+          "content_type": {
+            "default": "",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "model_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Id"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "maxLength": 2000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalog",
+          "profile_id"
+        ],
+        "title": "ServicePreviewPayload",
+        "type": "object"
+      },
       "SessionBranchBody": {
         "properties": {
           "new_key": {
@@ -9239,6 +9333,36 @@
         "title": "SessionSummary",
         "type": "object"
       },
+      "SessionTaskLinks": {
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "status_link_enabled": {
+            "default": true,
+            "title": "Status Link Enabled",
+            "type": "boolean"
+          },
+          "task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Task Ids",
+            "type": "array"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "session_id"
+        ],
+        "title": "SessionTaskLinks",
+        "type": "object"
+      },
       "SetRoleRequest": {
         "description": "Payload for the PUT /users/{username}/role endpoint.",
         "properties": {
@@ -9536,6 +9660,31 @@
           "content"
         ],
         "title": "SoulUpdateBody",
+        "type": "object"
+      },
+      "StatusColors": {
+        "additionalProperties": false,
+        "properties": {
+          "doing": {
+            "default": "#a16207",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Doing",
+            "type": "string"
+          },
+          "done": {
+            "default": "#15803d",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Done",
+            "type": "string"
+          },
+          "todo": {
+            "default": "#2563eb",
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "title": "Todo",
+            "type": "string"
+          }
+        },
+        "title": "StatusColors",
         "type": "object"
       },
       "SubagentMessageRequest": {
@@ -9986,13 +10135,27 @@
         "type": "object"
       },
       "TaskBoard": {
-        "description": "A consistent snapshot of the current workspace's board.",
         "properties": {
           "cards": {
             "items": {
               "$ref": "#/components/schemas/TaskCard"
             },
             "title": "Cards",
+            "type": "array"
+          },
+          "colors": {
+            "$ref": "#/components/schemas/StatusColors"
+          },
+          "revision": {
+            "default": 0,
+            "title": "Revision",
+            "type": "integer"
+          },
+          "session_links": {
+            "items": {
+              "$ref": "#/components/schemas/SessionTaskLinks"
+            },
+            "title": "Session Links",
             "type": "array"
           }
         },
@@ -10004,7 +10167,6 @@
       },
       "TaskCard": {
         "additionalProperties": false,
-        "description": "Persisted card returned to the board, including archived cards.",
         "properties": {
           "archived": {
             "title": "Archived",
@@ -10042,6 +10204,17 @@
           "updated_at": {
             "title": "Updated At",
             "type": "string"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
           }
         },
         "required": [
@@ -11293,7 +11466,6 @@
       },
       "UpdateCard": {
         "additionalProperties": false,
-        "description": "Only supplied fields change, preserving concurrent edits to other fields.",
         "properties": {
           "archived": {
             "anyOf": [
@@ -11346,6 +11518,18 @@
               }
             ],
             "title": "Title"
+          },
+          "workspace_id": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace Id"
           }
         },
         "title": "UpdateCard",
@@ -12564,6 +12748,30 @@
           "voice_autoplay"
         ],
         "title": "VoiceAutoplayUpdate",
+        "type": "object"
+      },
+      "VoiceDiscoveryPayload": {
+        "properties": {
+          "catalog": {
+            "additionalProperties": true,
+            "title": "Catalog",
+            "type": "object"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "profile_id": {
+            "title": "Profile Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "catalog",
+          "profile_id",
+          "model_id"
+        ],
+        "title": "VoiceDiscoveryPayload",
         "type": "object"
       },
       "VoiceMathSpeakUpdate": {
@@ -20727,7 +20935,7 @@
     },
     "/api/knowledge-bases": {
       "get": {
-        "description": "List all available knowledge bases with their details.",
+        "description": "Disk probes must not block the async worker or its other requests (#1711).",
         "operationId": "list_knowledge_bases_api_knowledge_bases_get",
         "parameters": [
           {
@@ -21793,7 +22001,7 @@
     },
     "/api/knowledge-bases/health": {
       "get": {
-        "description": "Health check endpoint",
+        "description": "Count registered KBs without constructing/probing the catalog (#1711).",
         "operationId": "health_check_api_knowledge_bases_health_get",
         "parameters": [
           {
@@ -51966,6 +52174,89 @@
         ]
       }
     },
+    "/api/settings/services/{service}/preview": {
+      "post": {
+        "description": "Stream a real result from the selected draft without applying it.",
+        "operationId": "preview_service_api_settings_services__service__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service",
+            "required": true,
+            "schema": {
+              "title": "Service",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "dt_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dt Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicePreviewPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Service",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
     "/api/settings/sidebar": {
       "get": {
         "operationId": "get_sidebar_settings_api_settings_sidebar_get",
@@ -53456,6 +53747,80 @@
           }
         },
         "summary": "Preview Voice",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/voice/voices": {
+      "post": {
+        "description": "Read live account voices for a draft selection, without applying it.",
+        "operationId": "list_voice_choices_api_settings_voice_voices_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "dt_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dt Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoiceDiscoveryPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Voice Choices",
         "tags": [
           "settings"
         ]
@@ -58527,7 +58892,6 @@
     },
     "/api/task-board": {
       "get": {
-        "description": "Return active and archived cards in the current workspace.",
         "operationId": "get_board_api_task_board_get",
         "parameters": [
           {
@@ -58593,7 +58957,6 @@
     },
     "/api/task-board/cards": {
       "post": {
-        "description": "Create a task in the To do column.",
         "operationId": "create_card_api_task_board_cards_post",
         "parameters": [
           {
@@ -58669,7 +59032,6 @@
     },
     "/api/task-board/cards/{card_id}": {
       "patch": {
-        "description": "Edit, move, archive or restore an existing task.",
         "operationId": "update_card_api_task_board_cards__card_id__patch",
         "parameters": [
           {
@@ -58747,6 +59109,312 @@
           }
         },
         "summary": "Update Card",
+        "tags": [
+          "task-board"
+        ]
+      }
+    },
+    "/api/task-board/colors": {
+      "put": {
+        "operationId": "update_colors_api_task_board_colors_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "dt_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dt Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatusColors"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Colors",
+        "tags": [
+          "task-board"
+        ]
+      }
+    },
+    "/api/task-board/events": {
+      "get": {
+        "operationId": "board_events_api_task_board_events_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "dt_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dt Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Board Events",
+        "tags": [
+          "task-board"
+        ]
+      }
+    },
+    "/api/task-board/sessions/{session_id}": {
+      "put": {
+        "operationId": "link_tasks_api_task_board_sessions__session_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "dt_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dt Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkTasks"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Tasks",
+        "tags": [
+          "task-board"
+        ]
+      }
+    },
+    "/api/task-board/sessions/{session_id}/status": {
+      "patch": {
+        "operationId": "link_status_api_task_board_sessions__session_id__status_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "dt_token",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Dt Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkStatus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskBoard"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Link Status",
         "tags": [
           "task-board"
         ]

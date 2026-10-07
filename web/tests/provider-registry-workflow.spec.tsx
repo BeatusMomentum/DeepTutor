@@ -19,7 +19,10 @@ import {
   providerRegistry,
   providerProbeInput,
   reconcileRegistrySave,
+  providerServiceSupport,
+  updateProvider,
 } from "@/lib/provider-registry";
+import { AddProviderPanel } from "@/components/settings/AddProviderPanel";
 import { modelTestFingerprint } from "@/lib/model-settings";
 
 const mocks = vi.hoisted(() => ({
@@ -256,33 +259,21 @@ it("search is a flat engine configuration without a fake context or model ID", (
   expect(screen.queryByLabelText("Model ID")).toBeNull();
   expect(screen.queryByLabelText("Context length (tokens)")).toBeNull();
 });
-it("offers a provider with no search API and leaves the rejection to the search test", () => {
+it("only offers search engines with a supported adapter", () => {
   live.connections = [xai()];
   render(<Harness page="search" />);
-  fireEvent.click(
-    screen.getByRole("button", { name: "Add search configuration" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Add search configuration" }));
   const select = screen.getByLabelText("Configured provider");
-  // Nothing says xAI runs a search API, and that is not a veto either: it is
-  // offered, grouped apart, and the search test is what rejects it.
-  expect(within(select).getByRole("option", { name: "xAI" })).toBeTruthy();
-  fireEvent.change(select, { target: { value: "connection:x" } });
-  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  const profile = mocks.settings.draft.services.search.profiles.at(-1)!;
-  // Staged under the vendor's own name: search has no OpenAI-compatible
-  // fallback, so `custom` here would only hide which engine was meant.
-  expect(profile.provider).toBe("xai");
-  expect(
-    screen.getByRole("region", { name: "Model connection test" }),
-  ).toBeTruthy();
+  expect(within(select).queryByRole("option", { name: "xAI" })).toBeNull();
+  expect(within(select).getByRole("option", { name: "Search account" })).toBeTruthy();
 });
-it("offers embedding providers with no adapter on record and leaves the verdict to the test", async () => {
+it("offers unverified embedding providers after opting into custom integration", async () => {
   live.connections = [xai()];
   render(<Harness page="embedding" />);
   fireEvent.click(screen.getByRole("button", { name: "Add model" }));
   const select = screen.getByLabelText("Configured provider");
-  // Nothing on the backend claims xAI serves embeddings, and that is not a
-  // veto: it is offered, grouped apart, and settled by the model test.
+  expect(within(select).queryByRole("option", { name: "xAI" })).toBeNull();
+  fireEvent.click(screen.getByLabelText("settings.serviceConfig.custom"));
   expect(within(select).getByRole("option", { name: "xAI" })).toBeTruthy();
   fireEvent.change(select, { target: { value: "connection:x" } });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -449,12 +440,13 @@ it("adds a provider over plain HTTP, where crypto.randomUUID does not exist", ()
   try {
     render(<Harness page="providers" />);
     fireEvent.click(screen.getByRole("button", { name: "Add provider" }));
-    fireEvent.change(screen.getByLabelText("Provider type"), {
-      target: { value: "custom" },
-    });
+    fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
+    fireEvent.change(screen.getByLabelText("settings.providerServices.name"), { target: { value: "My gateway" } });
+    fireEvent.change(screen.getByLabelText("Provider URL"), { target: { value: "http://gateway.test/v1" } });
+    fireEvent.change(screen.getByLabelText("settings.providerServices.protocol"), { target: { value: "anthropic" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     const staged = (mocks.settings.draft.connections ?? []).at(-1)!;
-    expect(staged).toMatchObject({ provider: "custom", api_key: "" });
+    expect(staged).toMatchObject({ provider: "custom", api_key: "", name: "My gateway", base_url: "http://gateway.test/v1", api_format: "anthropic" });
     expect(staged.id).toMatch(/^conn-[0-9a-f-]{36}$/);
     expect(
       screen.getByRole("region", { name: "Provider settings" }),
@@ -462,4 +454,65 @@ it("adds a provider over plain HTTP, where crypto.randomUUID does not exist", ()
   } finally {
     if (webCrypto) webCrypto.randomUUID = original;
   }
+});
+
+it("enabling speech on a provider makes it selectable and keeps the chosen service adapter", () => {
+  window.history.replaceState(null, "", "/settings/connections?provider=llm%3Alegacy");
+  const view = render(<Harness page="providers" />);
+  fireEvent.click(screen.getByRole("checkbox", { name: /Text-to-Speech/ }));
+  expect(mocks.settings.draft.services.llm.profiles[0].service_overrides?.tts).toEqual({ enabled: true, binding: "custom" });
+  view.rerender(<Harness page="voice" />);
+  fireEvent.click(screen.getByRole("button", { name: "Add model" }));
+  const select = screen.getByLabelText("Configured provider");
+  expect(within(select).getByRole("option", { name: "My account" })).toBeTruthy();
+  fireEvent.change(select, { target: { value: "llm:legacy" } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(mocks.settings.draft.services.tts.profiles.at(-1)?.provider_ref).toMatchObject({ service: "llm", profile_id: "legacy", binding: "custom" });
+});
+
+it("keeps explicit disabled services out of new model choices even in custom mode", () => {
+  live.services.llm.profiles[0].service_overrides = { tts: { enabled: false } };
+  render(<Harness page="voice" />);
+  fireEvent.click(screen.getByRole("button", { name: "Add model" }));
+  fireEvent.click(screen.getByLabelText("settings.serviceConfig.custom"));
+  expect(within(screen.getByLabelText("Configured provider")).queryByRole("option", { name: "My account" })).toBeNull();
+  expect(live.services.llm.profiles[0].models).toHaveLength(2);
+});
+
+it("uses live service metadata while manual choices survive reprobes and credential edits", () => {
+  const source = providerRegistry(live)[0];
+  source.source.discovery = { status: "connected", models: [], capabilities: [{ category: "tts", evidence: "metadata" }] };
+  const providers = { llm: [], tts: [] } as unknown as SettingsContextValue["providers"];
+  expect(providerServiceSupport(source, "tts", [], providers)).toEqual({ enabled: true, evidence: "detected" });
+  updateProvider(live, source.ref, "service_overrides", { tts: { enabled: false }, stt: { enabled: true, binding: "custom" } });
+  expect(source.source.discovery?.status).toBe("connected");
+  expect(providerServiceSupport(source, "tts", [], providers)).toEqual({ enabled: false, evidence: "manual" });
+  updateProvider(live, source.ref, "api_key", "rotated");
+  expect(source.source.discovery).toBeUndefined();
+  expect(providerServiceSupport(source, "stt", [], providers)).toEqual({ enabled: true, evidence: "manual" });
+});
+
+it("categorizes cross-service providers without duplicating accounts and supports search", () => {
+  const props = { options: [
+    { value: "a", label: "Aggregate", services: ["llm", "tts"] as const },
+    { value: "b", label: "Search only", services: ["search"] as const },
+    { value: "custom", label: "Custom", services: [] },
+  ].map(p => ({ ...p, services: [...p.services] })), vendor: "", onVendor: vi.fn(), onCreate: vi.fn(), onCancel: vi.fn() };
+  render(<AddProviderPanel {...props} />);
+  fireEvent.click(screen.getByRole("button", { name: "settings.providerServices.filter.multi" }));
+  expect(screen.getByRole("radio", { name: "Aggregate" })).toBeTruthy();
+  expect(screen.queryByRole("radio", { name: "Search only" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "settings.providerServices.filter.all" }));
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Search only" } });
+  expect(screen.getAllByRole("radio")).toHaveLength(1);
+  expect(screen.getByRole("radio", { name: "Search only" })).toBeTruthy();
+});
+
+it("failed reprobes replace stale discovery instead of retaining a green capability result", async () => {
+  mocks.fetch.mockRejectedValue(new Error("network"));
+  const onResult = vi.fn();
+  render(<RegistryProbe input={{ binding: "custom", base_url: "https://gateway.test/v1" }} discovery={{ status: "connected", models: [{ id: "old" }] }} onResult={onResult} />);
+  fireEvent.click(screen.getByRole("button", { name: "Test provider" }));
+  await waitFor(() => expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ status: "unreachable", models: [] })));
+  expect(screen.queryByText("settings.providerServices.catalogListed")).toBeNull();
 });

@@ -363,6 +363,11 @@ export default function ChatWorkspace({
   // What the composer's skill / MCP pickers may offer, clipped to what this
   // conversation's workspace already allows.
   const resourceCatalog = useComposerResources(state.workspaceId, workspaces);
+  const [draftTaskSelections, setDraftTaskSelections] = useState<Record<string, string[]>>({});
+  const draftTaskIds = useMemo(
+    () => draftTaskSelections[state.sessionKey] ?? [],
+    [draftTaskSelections, state.sessionKey],
+  );
   const activeWorkspace = useMemo(
     () =>
       state.workspaceId
@@ -2015,6 +2020,9 @@ export default function ChatWorkspace({
         _persistent_knowledge_bases: retainedKnowledgeBases(state.knowledgeBases, agentNameSet, resourceReuse.policy),
       };
 
+      if (!state.sessionId && draftTaskIds.length) {
+        config = { ...(config ?? {}), linked_task_ids: draftTaskIds };
+      }
       const memoryPayload = [...memoryReferencesPayload];
       const messageContent =
         content ||
@@ -2063,7 +2071,7 @@ export default function ChatWorkspace({
       if (!resourceReuse.policy.memory) setSelectedMemoryFiles([]);
     },
     [
-      resourceReuse, state.knowledgeBases, state.resourceSelection, agentNameSet, setKBs, setPersonaSelection, setResourceSelection,
+      draftTaskIds, state.sessionId, resourceReuse, state.knowledgeBases, state.resourceSelection, agentNameSet, setKBs, setPersonaSelection, setResourceSelection,
       attachments,
       bookReferencesPayload,
       courseId,
@@ -2811,6 +2819,10 @@ export default function ChatWorkspace({
                 onSetSpaceMenuOpen={setSpaceMenuOpen}
                 onToggleKB={handleToggleKB}
                 onSelectLLM={setLLMSelection}
+                taskSessionId={state.sessionId}
+                draftTaskIds={draftTaskIds}
+                onDraftTaskIdsChange={ids => setDraftTaskSelections(value => ({ ...value, [state.sessionKey]: ids }))}
+                onTasksLinked={ensureActivityPanelOpen}
                 onSelectNotebookPicker={handleSelectNotebookPicker}
                 onSelectBookPicker={handleSelectBookPicker}
                 onSelectReadingPicker={handleSelectReadingPicker}
@@ -2930,6 +2942,8 @@ export default function ChatWorkspace({
               onClose={handleClosePreview}
             />
             <SessionViewerPanel
+              taskDraftIds={draftTaskIds}
+              onTaskDraftChange={ids => setDraftTaskSelections(value => ({ ...value, [state.sessionKey]: ids }))}
               ref={viewerPanelRef}
               open={viewerPanelOpen && previewSource === null}
               sessionId={state.sessionId}

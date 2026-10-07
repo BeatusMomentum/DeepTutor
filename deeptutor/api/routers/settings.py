@@ -244,6 +244,21 @@ class VoicePreviewPayload(BaseModel):
     text: str = Field(min_length=1, max_length=500)
 
 
+class VoiceDiscoveryPayload(BaseModel):
+    catalog: dict[str, Any]
+    profile_id: str
+    model_id: str
+
+
+class ServicePreviewPayload(BaseModel):
+    catalog: dict[str, Any]
+    profile_id: str
+    model_id: str | None = None
+    text: str = Field(default="", max_length=2000)
+    audio: str = Field(default="", max_length=11184812)
+    content_type: str = ""
+
+
 class CatalogPayload(BaseModel):
     catalog: dict[str, Any]
 
@@ -2168,6 +2183,26 @@ async def update_enabled_tools(update: EnabledToolsUpdate):
     return {"enabled_optional_tools": sanitized}
 
 
+@router.post("/voice/voices")
+async def list_voice_choices(payload: VoiceDiscoveryPayload):
+    """Read live account voices for a draft selection, without applying it."""
+    _require_settings_admin()
+    from deeptutor.services.voice.discovery import discover_voices
+
+    service = get_model_catalog_service()
+    current = service.load()
+    saved = get_settings_draft_service().load().get("catalog")
+    source = restore_catalog_secrets(saved, current) if isinstance(saved, dict) else current
+    catalog = service.resolve_connections(restore_catalog_secrets(payload.catalog, source))
+    try:
+        result = await discover_voices(catalog, payload.profile_id, payload.model_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(
+        json.dumps(result), media_type="application/json", headers={"Cache-Control": "no-store"}
+    )
+
+
 @router.post(
     "/voice/preview",
     response_class=Response,
@@ -2201,6 +2236,45 @@ async def preview_voice(payload: VoicePreviewPayload) -> Response:
             detail=preview_failure_message(exc),
         ) from exc
     return Response(audio, media_type=content_type, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/services/{service}/preview")
+async def preview_service(service: str, payload: ServicePreviewPayload):
+    """Stream a real result from the selected draft without applying it."""
+    _require_settings_admin()
+    from deeptutor.services.settings.service_preview import preview_events, validate_input
+    from deeptutor.services.voice.discovery import selected_catalog
+
+    try:
+        audio = validate_input(service, payload.text, payload.audio, payload.content_type)
+        catalog_service = get_model_catalog_service()
+        current = catalog_service.load()
+        saved = get_settings_draft_service().load().get("catalog")
+        source = restore_catalog_secrets(saved, current) if isinstance(saved, dict) else current
+        catalog = catalog_service.resolve_connections(
+            restore_catalog_secrets(payload.catalog, source)
+        )
+        selected_catalog(catalog, service, payload.profile_id, payload.model_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    async def stream():
+        async for event in preview_events(
+            catalog,
+            service,
+            payload.profile_id,
+            payload.model_id,
+            payload.text,
+            audio,
+            payload.content_type,
+        ):
+            yield json.dumps(event, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        stream(),
+        media_type="application/x-ndjson",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.post("/tests/{service}/start")

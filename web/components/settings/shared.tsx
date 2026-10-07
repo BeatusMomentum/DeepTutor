@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from '@/components/layout/FeaturePage'
 import type {
   CatalogProfile,
   ServiceName,
@@ -215,23 +216,6 @@ export function SettingsPageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <header className="mb-7 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-      <div className="min-w-0">
-        <h1
-          data-tour="tour-page-heading"
-          className="text-[26px] font-semibold tracking-tight text-[var(--foreground)]"
-        >
-          {title}
-        </h1>
-        {description && (
-          <p className="mt-1.5 max-w-[62ch] text-[13px] leading-relaxed text-[var(--muted-foreground)]">
-            {description}
-          </p>
-        )}
-      </div>
-      {actions && (
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
-      )}
-    </header>
+    <PageHeader title={title} description={description} action={actions} headingTour="tour-page-heading" />
   );
 }

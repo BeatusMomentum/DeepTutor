@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader, PAGE_SECTION_TITLE_CLASS, pageGridClass } from '@/components/layout/FeaturePage'
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslation } from "react-i18next";
@@ -304,25 +305,21 @@ export default function SpaceDashboard() {
 
   return (
     <div>
-      <header className="mb-8">
-        <h1 className="font-serif text-[24px] font-semibold leading-tight tracking-tight text-[var(--foreground)]">
-          {tr({ zh: "学习空间", en: "Learning Space" })}
-        </h1>
-        <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-[var(--muted-foreground)]">
-          {tr({
+      <PageHeader
+        title={tr({ zh: "学习空间", en: "Learning Space" })}
+        description={tr({
             zh: "你的对话、智能体、笔记与题目，集中在一处 —— 从这里进入。",
             en: "Your conversations, agents, notebooks, and questions in one place — enter from here.",
           })}
-        </p>
-      </header>
+      />
 
       <div className="space-y-9">
         {groups.map(group => (
           <section key={group.label.en}>
-            <h2 className="mb-3 px-0.5 font-serif text-[16px] font-semibold tracking-tight text-[var(--foreground)]">
+            <h2 className={`mb-3 ${PAGE_SECTION_TITLE_CLASS}`}>
               {tr(group.label)}
             </h2>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className={pageGridClass(2)}>
               {group.items.map(item => (
                 <DashboardCard
                   key={item.key}
