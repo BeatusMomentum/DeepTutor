@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Cable, Plus, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { formatConfiguredProviderName, formatProviderLabel } from "@/lib/provider-branding";
 import ProviderIcon from "@/components/common/ProviderIcon";
 import { randomUuid } from "@/lib/random-uuid";
 import {
@@ -45,7 +46,8 @@ import {
 } from "./WorkspaceShell";
 
 export function ProvidersWorkspace() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const uiLanguage = i18n?.resolvedLanguage ?? i18n?.language ?? "en";
   const {
     catalog,
     draft,
@@ -93,6 +95,7 @@ export function ProvidersWorkspace() {
     providers[service]?.some(p => p.value === option.value && p.status !== "deprecated") ||
     Boolean(connectionTargets.find(target => target.provider === option.value)?.services[service]))
   })).sort((a, b) => a.label.localeCompare(b.label));
+  const optionLabel = (provider: string) => formatProviderLabel(provider, options.find(p => p.value === provider)?.label ?? provider, uiLanguage);
   const source = sources.find((p) => p.id === selected);
   const option = options.find((p) => p.value === source?.provider);
   const managed = source?.provider === "openai_codex";
@@ -144,7 +147,7 @@ export function ProvidersWorkspace() {
   const savedIds = new Set(providerRegistry(catalog).map((p) => p.id));
   const saved = Boolean(source && savedIds.has(source.id));
   const filtered = sources.filter((p) =>
-    `${p.name} ${p.provider}`.toLowerCase().includes(query.toLowerCase()),
+    `${formatConfiguredProviderName(p.provider, p.name, uiLanguage)} ${optionLabel(p.provider)} ${p.provider}`.toLowerCase().includes(query.toLowerCase()),
   );
   const hints = source ? PROVIDER_SERVICES.filter(service => providerServiceSupport(source, service, connectionTargets, providers).enabled)
     .map(service => ["tts", "stt"].includes(service) ? "voice" : ["imagegen", "videogen"].includes(service) ? "generation" : service) : [];
@@ -198,18 +201,18 @@ export function ProvidersWorkspace() {
                 >
                   <span className="flex items-center gap-2">
                     <ProviderIcon provider={p.provider} size={16} />
-                    <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
-                      {p.name}
+                    <span className="min-w-0 flex-1 truncate text-[14px] font-medium">
+                      {formatConfiguredProviderName(p.provider, p.name, uiLanguage)}
                     </span>
                   </span>
-                  <span className="mt-1 block pl-[24px] text-[11px] text-[var(--muted-foreground)]">
+                  <span className="mt-1 block pl-[24px] text-[12px] text-[var(--muted-foreground)]">
                     {t("{{count}} configured models", {
                       count: providerUsage(draft, p),
                     })}
                     {!savedIds.has(p.id) && ` · ${t("Not saved")}`}
                   </span>
                   <span className="mt-2 flex flex-wrap gap-1 pl-6">
-                    {PROVIDER_SERVICES.filter(service => providerServiceSupport(p, service, connectionTargets, providers).enabled).map(service => <span key={service} className="rounded bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-[var(--muted-foreground)]">{t(SERVICE_TITLES[service])}</span>)}
+                    {PROVIDER_SERVICES.filter(service => providerServiceSupport(p, service, connectionTargets, providers).enabled).map(service => <span key={service} className="rounded bg-[var(--muted)] px-1.5 py-0.5 text-[11px] text-[var(--muted-foreground)]">{t(SERVICE_TITLES[service])}</span>)}
                   </span>
                 </button>
               );
@@ -238,8 +241,8 @@ export function ProvidersWorkspace() {
                 // this pane was drawing preflight's default grey border.
                 className="min-w-0 overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--primary)_35%,var(--border))]"
               >
-                <header className="border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--primary)_4%,var(--background))] px-5 py-4">
-                  <p className="mb-1 text-[11px] font-medium text-[var(--primary)]">
+                <header className="border-b border-[var(--border)] bg-[color-mix(in_srgb,var(--primary)_4%,var(--background))] px-4 py-5 sm:px-6">
+                  <p className="mb-1 text-[12px] font-medium text-[var(--primary)]">
                     {t("Configuring provider")}
                   </p>
                   <EditableRegistryName
@@ -248,12 +251,12 @@ export function ProvidersWorkspace() {
                     label={t("Rename provider")}
                     onChange={(name) => change("name", name)}
                   />
-                  <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                    {option?.label || source.provider}
+                  <p className="mt-1 text-[13px] text-[var(--muted-foreground)]">
+                    {optionLabel(source.provider)}
                     {!saved && ` · ${t("Not saved")}`}
                   </p>
                 </header>
-                <div className="space-y-5 p-5">
+                <div className="space-y-6 p-4 sm:p-6">
                   {managed ? (
                     <CodexOAuthCard />
                   ) : (
@@ -272,7 +275,7 @@ export function ProvidersWorkspace() {
                               option?.base_url || "https://api.example.com/v1"
                             }
                           />
-                          <p className="text-xs leading-relaxed text-[var(--muted-foreground)]">
+                          <p className="text-[13px] leading-relaxed text-[var(--muted-foreground)]">
                             {t(
                               "Leave blank to use the provider default. Enter a custom URL for a gateway or private deployment.",
                             )}
@@ -313,7 +316,7 @@ export function ProvidersWorkspace() {
                         <div className="space-y-2">
                           <RegistryField label={t("Speech App ID (legacy console only)")}
                             value={connection.app_id ?? ""} onChange={v => change("app_id", v)} />
-                          <p className="text-xs leading-relaxed text-[var(--muted-foreground)]">
+                          <p className="text-[13px] leading-relaxed text-[var(--muted-foreground)]">
                             {t("Use the Speech console API key. For the legacy console, enter App ID and put the access token in the key field. Ark keys are separate.")}
                           </p>
                         </div>
@@ -321,7 +324,7 @@ export function ProvidersWorkspace() {
                       {providerServiceSupport(source, "llm", connectionTargets, providers).enabled && <ProviderProtocol value={connection.api_format || "auto"} onChange={value => change("api_format", value)} />}
                       <ProviderServices key={source.id} source={source} onChange={value => change("service_overrides", value)} />
                       <details className={`p-3.5 ${subPanelClass}`}>
-                        <summary className="cursor-pointer select-none rounded text-xs font-medium marker:text-[var(--muted-foreground)]">
+                        <summary className="cursor-pointer select-none rounded text-[13px] font-medium marker:text-[var(--muted-foreground)]">
                           {t("Advanced connection settings")}
                         </summary>
                         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -398,7 +401,7 @@ export function ProvidersWorkspace() {
                         <Link
                           key={path}
                           href={`/settings/${path}?provider=${encodeURIComponent(source.id)}`}
-                          className="inline-flex items-center gap-1 rounded-lg border border-[color-mix(in_srgb,var(--border)_80%,transparent)] px-2.5 py-1.5 text-xs text-[var(--muted-foreground)] transition-[background-color,border-color,color] duration-150 hover:border-[color-mix(in_srgb,var(--foreground)_20%,var(--border))] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[color-mix(in_srgb,var(--border)_80%,transparent)] px-2.5 py-1.5 text-[13px] text-[var(--muted-foreground)] transition-[background-color,border-color,color] duration-150 hover:border-[color-mix(in_srgb,var(--foreground)_20%,var(--border))] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
                         >
                           {t(label)}
                           <ArrowRight size={12} />
