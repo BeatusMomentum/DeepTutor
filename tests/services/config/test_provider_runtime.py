@@ -1114,3 +1114,54 @@ def test_old_adopted_fallback_is_not_a_model_capacity():
     assert resolve_llm_runtime_config(catalog=catalog).context_window is None
     model["context_window_source"] = "manual"
     assert resolve_llm_runtime_config(catalog=catalog).context_window == 16384
+
+
+def test_llm_opper_binding_uses_default_openai_compatible_endpoint() -> None:
+    catalog = _build_catalog(
+        llm_profile={
+            "id": "llm-p",
+            "name": "Opper",
+            "binding": "opper",
+            "base_url": "",
+            "api_key": "opper-key",
+            "api_version": "",
+            "extra_headers": {},
+            "models": [
+                {
+                    "id": "llm-m",
+                    "name": "Claude Sonnet 4.6",
+                    "model": "claude-sonnet-4-6",
+                }
+            ],
+        }
+    )
+
+    resolved = resolve_llm_runtime_config(catalog=catalog)
+
+    assert resolved.provider_name == "opper"
+    assert resolved.provider_mode == "gateway"
+    assert resolved.binding == "opper"
+    assert resolved.model == "claude-sonnet-4-6"
+    assert resolved.api_key == "opper-key"
+    assert resolved.effective_url == "https://api.opper.ai/v3/compat"
+
+
+def test_llm_opper_base_url_detection_preserves_openai_binding_compatibility() -> None:
+    catalog = _build_catalog(
+        llm_profile={
+            "id": "llm-p",
+            "name": "OpenAI Compatible",
+            "binding": "openai",
+            "base_url": "https://api.opper.ai/v3/compat",
+            "api_key": "opper-key",
+            "api_version": "",
+            "extra_headers": {},
+            "models": [{"id": "llm-m", "name": "GPT", "model": "gpt-5.4-mini"}],
+        }
+    )
+
+    resolved = resolve_llm_runtime_config(catalog=catalog)
+
+    assert resolved.provider_name == "opper"
+    assert resolved.provider_mode == "gateway"
+    assert resolved.effective_url == "https://api.opper.ai/v3/compat"

@@ -561,6 +561,7 @@ def test_registered_cloud_openai_compat_providers_enable_native_tools() -> None:
         "api_route",
         "requesty",
         "futureinfra",
+        "opper",
         "y_api",
         "edenai",
         "novita",

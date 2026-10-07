@@ -344,6 +344,16 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         default_api_base="https://futureinfra.ai/v1/ai",
     ),
     ProviderSpec(
+        name="opper",
+        keywords=("opper",),
+        env_key="OPPER_API_KEY",
+        display_name="Opper",
+        backend="openai_compat",
+        is_gateway=True,
+        detect_by_base_keyword="api.opper.ai",
+        default_api_base="https://api.opper.ai/v3/compat",
+    ),
+    ProviderSpec(
         name="y_api",
         keywords=("y_api", "y-api", "yapi"),
         env_key="Y_API_KEY",
