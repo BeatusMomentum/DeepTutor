@@ -5487,5 +5487,20 @@
   "Independent visual evidence is still required for this objective.": "此目标仍需要独立视觉证据。",
   "Assisted practice is recorded separately from independent mastery.": "辅助练习与独立掌握分开记录。",
   "Please review assessment {{questionId}} against its original source evidence. If it is unsupported, invalidate it and recompute learning state. Do not grant mastery merely because I challenged it.": "请对照原始来源复核判定 {{questionId}}。如果没有可靠依据，请作废并重算学习状态；不能只因我提出申诉就授予掌握状态。",
-  "Current model input has no verified source pixels. Retrieve the image again with a vision-capable model before grading.": "当前模型输入没有已核验的来源像素。请使用支持视觉的模型重新读取原图，再进行评分。"
+  "Current model input has no verified source pixels. Retrieve the image again with a vision-capable model before grading.": "当前模型输入没有已核验的来源像素。请使用支持视觉的模型重新读取原图，再进行评分。",
+  "Indexing recovery details": "索引恢复详情",
+  "Could not read indexing state. Refresh and retry.": "无法读取索引状态，请刷新重试。",
+  "Run state": "任务状态",
+  "Current phase": "当前阶段",
+  "Runtime": "运行时长",
+  "Since activity": "距最近活动",
+  "Since measurable progress": "距最近可测进度",
+  "Phase progress is indeterminate.": "当前阶段进度无法确定。",
+  "Phase completion does not mean the whole index is ready.": "阶段完成不代表整个索引已经就绪。",
+  "Verified index version": "已验证索引版本",
+  "Retry reuses validated parser outputs. Interrupted embedding stages restart.": "重试复用已验证的解析结果。中断的嵌入阶段将重新执行。",
+  "Parse cache reused": "已复用解析缓存",
+  "Cancellation pending at a safe boundary": "等待安全边界取消",
+  "Cancel indexing": "取消索引",
+  "No durable indexing run recorded yet.": "尚未记录持久索引任务。"
 }

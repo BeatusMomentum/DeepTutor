@@ -172,6 +172,30 @@ class LlamaIndexDocumentLoader:
         for file_path_str in classification.unsupported:
             self.logger.warning(f"Skipped unsupported file: {Path(file_path_str).name}")
 
+        from deeptutor.knowledge.indexing_run import current_run
+
+        if run := current_run():
+            accepted = {
+                str(Path(doc.metadata["file_path"]).resolve())
+                for doc in documents
+                if isinstance(getattr(doc, "metadata", None), dict)
+                and doc.metadata.get("file_path")
+            }
+            for name in (
+                classification.parser_files + classification.text_files + classification.image_files
+            ):
+                source = Path(name)
+                if str(source.resolve()) in accepted:
+                    run.document(source, "embedding")
+                elif (
+                    run.data["documents"].get(run.source_key(source), {}).get("status") != "failed"
+                ):
+                    run.document(
+                        source,
+                        "failed",
+                        reason="invalid_output",
+                        detail="No usable document content.",
+                    )
         return documents
 
     def _parse_document(

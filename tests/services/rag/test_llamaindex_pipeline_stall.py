@@ -338,6 +338,7 @@ async def test_initialize_succeeds_when_indexing_completes(
     _pipeline_module, storage_module, _ = _llamaindex_modules()
     pipeline = _make_pipeline(tmp_path, monkeypatch)
     monkeypatch.setattr(storage_module, "create_index", lambda *a, **k: 7)
+    monkeypatch.setattr(storage_module, "verify_persisted_index", lambda path: None)
 
     assert await pipeline.initialize("kb", ["doc.pdf"]) is True
 

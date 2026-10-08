@@ -1023,6 +1023,13 @@ async def run_initialization_task(
             indexed_count = len(
                 FileTypeRouter.collect_supported_files(initializer.raw_dir, recursive=True)
             )
+            from deeptutor.knowledge.indexing_run import load_run
+
+            receipt = load_run(initializer.raw_dir.parent)
+            if receipt and receipt.get("provider") == "llamaindex":
+                indexed_count = sum(
+                    doc.get("status") == "completed" for doc in receipt["documents"].values()
+                )
 
             initializer.progress_tracker.update(
                 ProgressStage.COMPLETED,
@@ -3994,6 +4001,7 @@ async def run_reindex_task(
                     manager._save_config()
 
             success = await rag_service.initialize(
+                task_id=task_id,
                 kb_name=kb_name,
                 file_paths=file_paths,
                 progress_callback=_on_progress,
@@ -4106,6 +4114,20 @@ async def reindex_knowledge_base(
         kb_entry = _load_kb_entry_or_404(manager, kb_name)
         _assert_not_connected_kb(kb_name, kb_entry)
         force_reindex = str(kb_entry.get("status") or "").lower() == "error"
+        from deeptutor.knowledge.indexing_run import visible_run
+
+        previous_run = visible_run(kb_base_dir / kb_name)
+        if previous_run:
+            if previous_run["state"] == "running":
+                raise HTTPException(
+                    status_code=409, detail="An indexing worker still owns this knowledge base."
+                )
+            force_reindex = force_reindex or previous_run["state"] in {
+                "partial",
+                "failed",
+                "cancelled",
+                "interrupted",
+            }
         kb_provider = _validate_registered_provider(
             kb_entry.get("rag_provider") or DEFAULT_PROVIDER
         )
@@ -4299,6 +4321,59 @@ async def retry_knowledge_base(
     except Exception as e:
         logger.error(f"Failed to retry KB '{kb_name}': {e}")
         raise HTTPException(status_code=500, detail=format_exception_message(e))
+
+
+@router.get("/knowledge-bases/{kb_name}/indexing-run")
+async def get_indexing_run(kb_name: str):
+    """Pure durable diagnostics; reading never recreates a task or retries work."""
+    from deeptutor.knowledge.indexing_run import visible_run
+
+    resource = resolve_kb(kb_name)
+    return {"run": visible_run(resource.base_dir / resource.name)}
+
+
+@router.post("/knowledge-bases/{kb_name}/indexing-run/{task_id}/cancel")
+async def cancel_indexing_run(kb_name: str, task_id: str):
+    from deeptutor.knowledge.indexing_run import request_cancel
+
+    _, name, base_dir = _writable_kb(kb_name)
+    if not request_cancel(base_dir / name, task_id):
+        raise HTTPException(status_code=409, detail="This indexing run is no longer active.")
+    return {
+        "cancel_requested": True,
+        "message": "Cancellation takes effect at the next safe boundary; completed parser outputs remain reusable.",
+    }
+
+
+@router.get("/knowledge-bases/{kb_name}/indexing-readiness")
+async def get_indexing_readiness(kb_name: str):
+    from deeptutor.services.embedding.config import get_embedding_config
+    from deeptutor.services.parsing import get_parse_service
+    from deeptutor.services.parsing.engines.factory import get_parser
+
+    resource = resolve_kb(kb_name)
+    engine = get_parse_service().active_engine()
+    parser = get_parser(engine)
+    config = parser.resolve_config()
+    report = parser.is_ready(config)
+    embedding = get_embedding_config()
+    return {
+        "parser": engine,
+        "ready": report.ready,
+        "reason": report.reason,
+        "message": report.message,
+        "formats": sorted(parser.supported_formats()),
+        "mode": getattr(config, "mode", None),
+        "device": getattr(config, "device", None),
+        "embedding_model": embedding.model,
+        "embedding_configured": bool(embedding.model),
+        "source_count": len(
+            FileTypeRouter.collect_supported_files(
+                resource.base_dir / resource.name / "raw", recursive=True
+            )
+        ),
+        "note": "Readiness checks configuration and local prerequisites; runtime downloads, resource limits and provider responses can still fail.",
+    }
 
 
 @router.get("/knowledge-bases/{kb_name}/progress")

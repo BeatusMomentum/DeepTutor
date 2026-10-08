@@ -5503,5 +5503,20 @@
   "Independent visual evidence is still required for this objective.": "Ten cel nadal wymaga samodzielnego dowodu rozumienia obrazu.",
   "Assisted practice is recorded separately from independent mastery.": "Ćwiczenia ze wsparciem są zapisywane oddzielnie od samodzielnego opanowania.",
   "Please review assessment {{questionId}} against its original source evidence. If it is unsupported, invalidate it and recompute learning state. Do not grant mastery merely because I challenged it.": "Sprawdź ocenę {{questionId}} na podstawie oryginalnego źródła. Jeśli jest nieuzasadniona, unieważnij ją i przelicz stan nauki. Samo zakwestionowanie nie dowodzi opanowania.",
-  "Current model input has no verified source pixels. Retrieve the image again with a vision-capable model before grading.": "Bieżące dane wejściowe modelu nie zawierają zweryfikowanego obrazu źródłowego. Przed oceną pobierz go ponownie modelem obsługującym obrazy."
+  "Current model input has no verified source pixels. Retrieve the image again with a vision-capable model before grading.": "Bieżące dane wejściowe modelu nie zawierają zweryfikowanego obrazu źródłowego. Przed oceną pobierz go ponownie modelem obsługującym obrazy.",
+  "Indexing recovery details": "Szczegóły odzyskiwania indeksu",
+  "Could not read indexing state. Refresh and retry.": "Nie można odczytać stanu indeksowania. Odśwież i spróbuj ponownie.",
+  "Run state": "Stan zadania",
+  "Current phase": "Bieżący etap",
+  "Runtime": "Czas działania",
+  "Since activity": "Od ostatniej aktywności",
+  "Since measurable progress": "Od mierzalnego postępu",
+  "Phase progress is indeterminate.": "Postęp etapu jest nieokreślony.",
+  "Phase completion does not mean the whole index is ready.": "Ukończenie etapu nie oznacza gotowości całego indeksu.",
+  "Verified index version": "Zweryfikowana wersja indeksu",
+  "Retry reuses validated parser outputs. Interrupted embedding stages restart.": "Ponowienie wykorzystuje zweryfikowane wyniki parsera. Przerwane etapy osadzania zaczynają się ponownie.",
+  "Parse cache reused": "Wykorzystano pamięć podręczną parsera",
+  "Cancellation pending at a safe boundary": "Anulowanie oczekuje na bezpieczną granicę",
+  "Cancel indexing": "Anuluj indeksowanie",
+  "No durable indexing run recorded yet.": "Nie zapisano jeszcze trwałego zadania indeksowania."
 }
