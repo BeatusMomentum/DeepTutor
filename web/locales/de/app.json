@@ -5502,5 +5502,8 @@
   "Parse cache reused": "Parsercache wiederverwendet",
   "Cancellation pending at a safe boundary": "Abbruch wartet auf sichere Grenze",
   "Cancel indexing": "Indexierung abbrechen",
-  "No durable indexing run recorded yet.": "Noch kein dauerhafter Indexierungslauf aufgezeichnet."
+  "No durable indexing run recorded yet.": "Noch kein dauerhafter Indexierungslauf aufgezeichnet.",
+  "Approve this MCP origin for private-network connections": "Diesen MCP-Ursprung für private Netzwerkverbindungen freigeben",
+  "Use an administrator-approved private MCP origin": "Einen administrativ freigegebenen privaten MCP-Ursprung verwenden",
+  "Only this scheme, host and port can use private Docker or LAN addresses. Metadata addresses remain blocked.": "Nur dieses Schema, dieser Host und Port dürfen private Docker- oder LAN-Adressen verwenden. Metadatenadressen bleiben gesperrt."
 }

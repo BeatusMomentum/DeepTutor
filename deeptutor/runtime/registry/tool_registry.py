@@ -204,7 +204,19 @@ def get_tool_registry() -> ToolRegistry:
         scope = (str(path.resolve()), 0, 0)
     if _default_registry is None or _default_plugin_scope != scope:
         _default_plugin_scope = scope
+        shared = (
+            [
+                tool
+                for tool in _default_registry._tools.values()
+                if getattr(tool, "provider_kind", "") == "mcp"
+                and getattr(tool, "owner", None) == "_shared"
+            ]
+            if _default_registry is not None
+            else []
+        )
         _default_registry = ToolRegistry()
         _default_registry.load_builtins()
+        for tool in shared:
+            _default_registry.register(tool)
         _default_registry.load_plugins()
     return _default_registry

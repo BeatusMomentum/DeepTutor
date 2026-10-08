@@ -5502,5 +5502,8 @@
   "Parse cache reused": "已复用解析缓存",
   "Cancellation pending at a safe boundary": "等待安全边界取消",
   "Cancel indexing": "取消索引",
-  "No durable indexing run recorded yet.": "尚未记录持久索引任务。"
+  "No durable indexing run recorded yet.": "尚未记录持久索引任务。",
+  "Approve this MCP origin for private-network connections": "批准此 MCP 来源使用私有网络连接",
+  "Use an administrator-approved private MCP origin": "使用管理员批准的私有 MCP 来源",
+  "Only this scheme, host and port can use private Docker or LAN addresses. Metadata addresses remain blocked.": "仅此协议、主机和端口可使用私有 Docker 或局域网地址。元数据地址仍被阻止。"
 }

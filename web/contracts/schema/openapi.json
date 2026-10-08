@@ -5628,6 +5628,11 @@
       "MCPServerConfig": {
         "description": "One MCP server entry.\n\n``type`` is auto-detected when omitted: ``command`` ⇒ stdio; a ``url``\nending in ``/sse`` ⇒ sse; any other ``url`` ⇒ streamableHttp.",
         "properties": {
+          "allow_private_network": {
+            "default": false,
+            "title": "Allow Private Network",
+            "type": "boolean"
+          },
           "args": {
             "items": {
               "type": "string"

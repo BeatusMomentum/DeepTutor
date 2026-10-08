@@ -45,6 +45,9 @@ AUTO_MOUNTED_TOOLS: frozenset[str] = frozenset(CONFIGURABLE_BUILTIN_TOOL_NAMES)
 # declared built-in is dropped when its gate is unmet — e.g. ``rag`` without a KB).
 # Insertion order fixes the default surface's conditional-tool order.
 _CONDITIONAL_MOUNT_FLAGS: dict[str, str] = {
+    "preprint": "has_scientific_research",
+    "research_audit": "has_scientific_research",
+    "research_lit": "has_scientific_research",
     "rag": "has_kb",
     "kb_files": "has_kb",
     "knowledge_frontier": "has_kb",
@@ -155,6 +158,7 @@ class ToolMountFlags:
     has_question_bank: bool = False
     has_skills: bool = False
     has_deferred_tools: bool = False
+    has_scientific_research: bool = False
     has_exec: bool = False
     #: The learner has at least one mastery topic to be sent back to.
     has_mastery_nav: bool = False

@@ -2007,6 +2007,9 @@ USER_TOGGLEABLE_TOOL_NAMES: tuple[str, ...] = (
 # context-gated built-ins (gate: the learner has a topic) rather than part of
 # any capability.
 CONFIGURABLE_BUILTIN_TOOL_NAMES: tuple[str, ...] = (
+    "preprint",
+    "research_audit",
+    "research_lit",
     "rag",
     "kb_files",
     "knowledge_frontier",

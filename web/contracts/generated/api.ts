@@ -13870,6 +13870,11 @@ export interface components {
      *     ending in ``/sse`` ⇒ sse; any other ``url`` ⇒ streamableHttp.
      */
     readonly MCPServerConfig: {
+      /**
+       * Allow Private Network
+       * @default false
+       */
+      readonly allow_private_network: boolean;
       /** Args */
       readonly args?: readonly string[];
       /**

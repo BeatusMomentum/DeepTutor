@@ -77,6 +77,14 @@ BUILTIN_TOOL_SPECS: tuple[BuiltinToolSpec, ...] = (
             ("learning_update", "LearningUpdateTool"),
         ),
     ),
+    *_specs(
+        "deeptutor.tools.research_tools",
+        (
+            ("preprint", "PreprintTool"),
+            ("research_audit", "ResearchAuditTool"),
+            ("research_lit", "ResearchLiteratureTool"),
+        ),
+    ),
     BuiltinToolSpec("exec", "deeptutor.tools.exec_tool:ExecTool"),
     *_specs(
         "deeptutor.tools.workspace",
