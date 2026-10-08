@@ -11,8 +11,8 @@ import pytest
 from deeptutor.capabilities.registry import discover_external_loop_capabilities
 from deeptutor.core.capability_protocol import CapabilityManifest, TurnCapability
 from deeptutor.core.context import UnifiedContext
-import deeptutor.core.entry_points as entry_points
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolResult
+import deeptutor.plugins.entry_points as entry_points
 from deeptutor.plugins.registry import PluginRegistry
 from deeptutor.reading.extensions import ReadingExtensionRegistry
 from deeptutor.reading.translation import TranslationExtension

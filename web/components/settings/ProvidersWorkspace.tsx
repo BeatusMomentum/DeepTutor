@@ -72,10 +72,12 @@ export function ProvidersWorkspace() {
         scrollToSettingsElement(editorRef.current),
       );
   };
-  useEffect(() => {
-    if (selected) revealDetail();
-  }, [selected]);
   const [adding, setAdding] = useState(false);
+  useEffect(() => {
+    if (adding)
+      requestAnimationFrame(() => scrollToSettingsElement(editorRef.current));
+    else if (selected) revealDetail();
+  }, [adding, selected]);
   const [vendor, setVendor] = useState("");
   const [query, setQuery] = useState("");
   const [auth, setAuth] = useState("");
@@ -95,11 +97,17 @@ export function ProvidersWorkspace() {
     providers[service]?.some(p => p.value === option.value && p.status !== "deprecated") ||
     Boolean(connectionTargets.find(target => target.provider === option.value)?.services[service]))
   })).sort((a, b) => a.label.localeCompare(b.label));
+  // Protocol-specific aliases still resolve saved accounts, but new accounts
+  // use the vendor once and select their protocol in the connection editor.
+  const addableOptions = options.filter((p) => p.status !== "legacy");
   const optionLabel = (provider: string) => formatProviderLabel(provider, options.find(p => p.value === provider)?.label ?? provider, uiLanguage);
   const source = sources.find((p) => p.id === selected);
   const option = options.find((p) => p.value === source?.provider);
   const managed = source?.provider === "openai_codex";
   const connection = source?.source;
+  const apiFormat = connection?.api_format ||
+    (option?.default_api_format as CatalogConnection["api_format"]) || "auto";
+  const defaultBaseUrl = option?.base_urls?.[apiFormat] || option?.base_url || "";
   const change = (field: string, value: unknown) => {
     if (source)
       mutateCatalog((next) => {
@@ -109,7 +117,7 @@ export function ProvidersWorkspace() {
       });
   };
   const create = (custom?: CustomProviderInput) => {
-    const option = options.find((o) => o.value === vendor);
+    const option = addableOptions.find((o) => o.value === vendor);
     if (!option) return;
     if (option.value === "openai_codex") {
       setAuth("openai_codex");
@@ -151,6 +159,18 @@ export function ProvidersWorkspace() {
   );
   const hints = source ? PROVIDER_SERVICES.filter(service => providerServiceSupport(source, service, connectionTargets, providers).enabled)
     .map(service => ["tts", "stt"].includes(service) ? "voice" : ["imagegen", "videogen"].includes(service) ? "generation" : service) : [];
+  if (adding)
+    return (
+      <div ref={editorRef} className="min-w-0 scroll-mt-4">
+        <AddProviderPanel
+          options={addableOptions}
+          vendor={vendor}
+          onVendor={setVendor}
+          onCreate={create}
+          onCancel={() => setAdding(false)}
+        />
+      </div>
+    );
   return (
     <div className="space-y-5">
       <WorkspaceSplit
@@ -163,7 +183,6 @@ export function ProvidersWorkspace() {
                 type="button"
                 onClick={() => {
                   setAdding(true);
-                  revealDetail();
                 }}
                 className={`${registryButton} w-full py-2`}
               >
@@ -221,18 +240,7 @@ export function ProvidersWorkspace() {
         }
         detail={
           <div ref={editorRef} className="min-w-0 scroll-mt-4">
-            {/* One configuring surface at a time. The add form used to open as a
-                band above the split while a provider's editor kept rendering
-                below it, so two things claimed to be "currently configuring". */}
-            {adding ? (
-              <AddProviderPanel
-                options={options}
-                vendor={vendor}
-                onVendor={setVendor}
-                onCreate={create}
-                onCancel={() => setAdding(false)}
-              />
-            ) : auth === "openai_codex" ? (
+            {auth === "openai_codex" ? (
               <CodexOAuthCard />
             ) : source && connection ? (
               <section
@@ -272,7 +280,7 @@ export function ProvidersWorkspace() {
                             value={connection.base_url}
                             onChange={(v) => change("base_url", v)}
                             placeholder={
-                              option?.base_url || "https://api.example.com/v1"
+                              defaultBaseUrl || "https://api.example.com/v1"
                             }
                           />
                           <p className="text-[13px] leading-relaxed text-[var(--muted-foreground)]">
@@ -321,7 +329,9 @@ export function ProvidersWorkspace() {
                           </p>
                         </div>
                       )}
-                      {providerServiceSupport(source, "llm", connectionTargets, providers).enabled && <ProviderProtocol value={connection.api_format || "auto"} onChange={value => change("api_format", value)} />}
+                      {providerServiceSupport(source, "llm", connectionTargets, providers).enabled && option?.api_formats?.length !== 0 && (
+                        <ProviderProtocol value={apiFormat} formats={option?.api_formats} onChange={value => change("api_format", value)} />
+                      )}
                       <ProviderServices key={source.id} source={source} onChange={value => change("service_overrides", value)} />
                       <details className={`p-3.5 ${subPanelClass}`}>
                         <summary className="cursor-pointer select-none rounded text-[13px] font-medium marker:text-[var(--muted-foreground)]">
@@ -354,7 +364,7 @@ export function ProvidersWorkspace() {
                         </div>
                       </details>
                       <RegistryProbe
-                        input={providerProbeInput(source, option?.base_url)}
+                        input={{ ...providerProbeInput(source, defaultBaseUrl), api_format: apiFormat }}
                         discovery={connection.discovery}
                         hints={hints}
                         showCapabilities={false}

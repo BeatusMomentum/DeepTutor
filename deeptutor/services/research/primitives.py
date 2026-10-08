@@ -14,9 +14,11 @@ from pathlib import Path, PurePosixPath
 import re
 import threading
 import time
+from typing import Any
 from urllib.parse import quote, urljoin, urlsplit
-from xml.etree import ElementTree as ET
 
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 import httpx
 
 from deeptutor.services.mcp.network import validate_mcp_url_async
@@ -239,7 +241,7 @@ class ResearchClient:
         selected = [source_path(value) for value in files] if files else choose_files(paths)
         if len(selected) > 8:
             raise ResearchError("Static audits read at most eight selected repository files.")
-        results = []
+        results: list[dict[str, Any]] = []
         for path in selected:
             if path not in paths:
                 results.append({"path": path, "status": "unavailable"})
@@ -280,7 +282,7 @@ def parse_feed(raw: bytes) -> list[dict]:
         raise ResearchError("Unexpected XML declarations in primary-source response.")
     try:
         root = ET.fromstring(raw)
-    except ET.ParseError as exc:
+    except (ET.ParseError, DefusedXmlException) as exc:
         raise ResearchError("Primary-source metadata was not a usable Atom feed.") from exc
     if root.tag != _ATOM + "feed":
         raise ResearchError("Primary-source metadata was not an Atom feed.")
@@ -309,7 +311,7 @@ def parse_feed(raw: bytes) -> list[dict]:
 def read_pdf(raw: bytes, pages: list[int] | None, figures: bool) -> tuple[dict, list[bytes]]:
     import fitz
 
-    images = []
+    images: list[bytes] = []
     rendered_pages = []
     try:
         opened = fitz.open(stream=raw, filetype="pdf")

@@ -31,10 +31,12 @@ export function ProviderProtocol({
   value,
   onChange,
   allowAuto = true,
+  formats,
 }: {
   value: ApiFormat
   onChange: (value: ApiFormat) => void
   allowAuto?: boolean
+  formats?: readonly string[]
 }) {
   const { t } = useTranslation()
   return (
@@ -45,8 +47,8 @@ export function ProviderProtocol({
         value={value}
         onChange={e => onChange(e.target.value as ApiFormat)}
       >
-        {allowAuto && <option value="auto">{t('Auto')}</option>}
-        {Object.entries(PROTOCOLS).map(([key, label]) => (
+        {allowAuto && (!formats || formats.includes('auto')) && <option value="auto">{t('Auto')}</option>}
+        {Object.entries(PROTOCOLS).filter(([key]) => !formats || formats.includes(key)).map(([key, label]) => (
           <option key={key} value={key}>
             {t(label)}
           </option>
@@ -106,7 +108,7 @@ export function AddProviderPanel({
       Boolean(parsed.hostname)
   } catch {}
   return (
-    <section aria-label={t('Add provider')} className={`min-w-0 space-y-4 p-5 ${subPanelClass}`}>
+    <section aria-label={t('Add provider')} className={`min-w-0 space-y-5 p-4 sm:p-6 ${subPanelClass}`}>
       <h3 className="text-base font-semibold">{t('Add provider')}</h3>
       <input
         type="search"
@@ -139,19 +141,20 @@ export function AddProviderPanel({
       <div
         role="radiogroup"
         aria-label={t('Provider type')}
-        className="grid max-h-80 gap-2 overflow-y-auto p-0.5 sm:grid-cols-2"
+        className="grid max-h-[min(28rem,50dvh)] grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] gap-3 overflow-y-auto overscroll-contain p-1"
       >
         {visible.map(option => (
           <label
             key={option.value}
-            className={`min-w-0 rounded-xl border p-3 text-left cursor-pointer outline-none focus-within:ring-2 focus-within:ring-[var(--ring)] ${vendor === option.value ? 'border-[var(--primary)] bg-[var(--accent)]' : 'border-[var(--border)] bg-[var(--background)] hover:bg-[var(--accent)]'}`}
+            className={`relative flex min-h-24 min-w-0 flex-col rounded-xl border p-4 text-left cursor-pointer outline-none has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--ring)] ${vendor === option.value ? 'border-[var(--primary)] bg-[var(--accent)]' : 'border-[var(--border)] bg-[var(--background)] hover:bg-[var(--accent)]'}`}
           >
+            {/* Anchor the hidden radio to its card so focus cannot scroll the settings shell. */}
             <input type="radio" className="sr-only" name={radioName} value={option.value} aria-label={option.value === 'custom' ? t('Custom') : option.label} checked={vendor === option.value} onChange={() => onVendor(option.value)} />
-            <span className="flex items-start gap-2 text-sm font-medium leading-5">
-              <ProviderIcon provider={option.value} size={16} />
+            <span className="flex items-start gap-2.5 text-[15px] font-medium leading-6">
+              <ProviderIcon provider={option.value} size={20} />
               <span className="min-w-0 break-words">{option.value === 'custom' ? t('Custom') : option.label}</span>
             </span>
-            <span className="mt-2 flex flex-wrap gap-1">
+            <span className="mt-3 flex flex-wrap gap-1.5">
               {option.value === 'custom' ? (
                 <span className="text-[13px] text-[var(--muted-foreground)]">
                   {t('settings.providerServices.customHint')}
@@ -160,7 +163,7 @@ export function AddProviderPanel({
                 option.services.map(service => (
                   <span
                     key={service}
-                    className="rounded bg-[var(--muted)] px-1.5 py-0.5 text-[11px] text-[var(--muted-foreground)]"
+                    className="rounded bg-[var(--muted)] px-2 py-0.5 text-[12px] text-[var(--muted-foreground)]"
                   >
                     {t(SERVICE_TITLES[service])}
                   </span>

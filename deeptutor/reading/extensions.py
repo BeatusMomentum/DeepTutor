@@ -16,7 +16,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field, model_validator
 
-from deeptutor.core.entry_points import load_entry_point_group
+from deeptutor.plugins.entry_points import load_entry_point_group
 
 logger = logging.getLogger(__name__)
 ENTRY_POINT_GROUP = "deeptutor.reading_extensions"

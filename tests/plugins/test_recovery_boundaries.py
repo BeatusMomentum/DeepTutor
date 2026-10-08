@@ -32,8 +32,8 @@ def test_external_upgrade_requires_review_even_when_permissions_are_unchanged(tm
 async def test_unapproved_entry_point_never_imports_and_cached_tool_remains_revocable(
     tmp_path, monkeypatch
 ):
-    import deeptutor.core.entry_points as loader
-    from deeptutor.core.entry_points import load_entry_point_group
+    import deeptutor.plugins.entry_points as loader
+    from deeptutor.plugins.entry_points import load_entry_point_group
     import deeptutor.plugins.runtime as runtime
 
     registry = _plugin_registry(tmp_path)

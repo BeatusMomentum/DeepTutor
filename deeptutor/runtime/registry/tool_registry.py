@@ -12,8 +12,8 @@ import inspect
 import logging
 from typing import Any
 
-from deeptutor.core.entry_points import load_entry_point_group
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolPromptHints
+from deeptutor.plugins.entry_points import load_entry_point_group
 from deeptutor.tools.builtin_specs import (
     BUILTIN_TOOL_NAMES,
     BUILTIN_TOOL_SPEC_BY_NAME,
@@ -188,7 +188,7 @@ class ToolRegistry:
 
 
 _default_registry: ToolRegistry | None = None
-_default_plugin_scope = None
+_default_plugin_scope: tuple[str, int, int] | None = None
 
 
 def get_tool_registry() -> ToolRegistry:

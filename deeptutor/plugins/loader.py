@@ -19,7 +19,7 @@ import logging
 from typing import Any
 
 from deeptutor.core.capability_protocol import TurnCapability
-from deeptutor.core.entry_points import load_entry_point_group
+from deeptutor.plugins.entry_points import load_entry_point_group
 
 logger = logging.getLogger(__name__)
 

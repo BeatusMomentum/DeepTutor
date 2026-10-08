@@ -11,8 +11,8 @@ import warnings
 from pydantic import BaseModel
 
 from deeptutor.core.capability_protocol import TurnCapability
-from deeptutor.core.entry_points import load_entry_point_group
 from deeptutor.i18n.metadata_i18n import capability_description_i18n
+from deeptutor.plugins.entry_points import load_entry_point_group
 from deeptutor.runtime.bootstrap.builtin_capabilities import BUILTIN_CAPABILITY_SPECS
 from deeptutor.runtime.capability_catalog import (
     CapabilityCatalog,

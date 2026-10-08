@@ -13,7 +13,7 @@ import warnings
 
 from deeptutor.capabilities.protocol import LoopExtension
 from deeptutor.core.context import UnifiedContext
-from deeptutor.core.entry_points import load_entry_point_group
+from deeptutor.plugins.entry_points import load_entry_point_group
 from deeptutor.runtime.capability_catalog import EmptyConfig, get_capability_catalog
 
 logger = logging.getLogger(__name__)
@@ -185,7 +185,8 @@ def discover_external_loop_capabilities():
     )
 
 
-discover_external_loop_capabilities.cache_clear = _discover_external_loop_capabilities.cache_clear
+# Preserve the public reset hook while checking plugin revocation on every discovery.
+discover_external_loop_capabilities.cache_clear = _discover_external_loop_capabilities.cache_clear  # type: ignore[attr-defined]
 
 
 def _register_loop_entry(name: str, factory: LoopFactory) -> None:

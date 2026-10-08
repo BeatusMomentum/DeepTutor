@@ -1480,8 +1480,7 @@ class SQLiteSessionStore:
     async def create_turn(
         self, session_id: str, capability: str = "", *, submission_id: str | None = None
     ) -> dict[str, Any]:
-        kwargs = {"submission_id": submission_id} if submission_id else {}
-        return await self.begin_turn(session_id, capability, **kwargs)
+        return await self.begin_turn(session_id, capability, submission_id=submission_id)
 
     def _get_turn_sync(self, turn_id: str) -> dict[str, Any] | None:
         with self._connect() as conn:

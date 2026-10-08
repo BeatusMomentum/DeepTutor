@@ -19,6 +19,16 @@ from deeptutor.services.research.primitives import (
 from deeptutor.tools.research_tools import PreprintTool, ResearchAuditTool
 
 
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16"])
+def test_feed_rejects_entity_declarations_in_supported_xml_encodings(encoding):
+    raw = (
+        '<!DOCTYPE feed [<!ENTITY injected "untrusted">]>'
+        '<feed xmlns="http://www.w3.org/2005/Atom">&injected;</feed>'
+    ).encode(encoding)
+    with pytest.raises(ResearchError):
+        primitives.parse_feed(raw)
+
+
 @pytest.fixture
 def sources(tmp_path, monkeypatch):
     monkeypatch.setattr(primitives, "ARXIV_INTERVAL", 0)
