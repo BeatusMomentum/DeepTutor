@@ -48,7 +48,15 @@ def load_entry_point_group(
     for ep in discovered:
         name = getattr(ep, "name", str(ep))
         try:
-            value = coerce(name, ep.load())
+            from deeptutor.plugins.runtime import entry_point_can_load, guard_entry_point_loaded
+
+            if not entry_point_can_load(ep, group):
+                emit.warning(
+                    "Plugin entry point %r is disabled, incompatible or unapproved; skipping import.",
+                    name,
+                )
+                continue
+            value = coerce(name, guard_entry_point_loaded(ep, group, ep.load()))
         except Exception:
             emit.warning("Failed to load %s entry point %r; skipping.", group, name, exc_info=True)
             continue

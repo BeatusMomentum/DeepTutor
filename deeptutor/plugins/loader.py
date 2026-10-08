@@ -53,6 +53,9 @@ def load_plugin_capability(manifest: PluginManifest) -> TurnCapability | None:
     if manifest.type and manifest.type != "capability":
         return None
 
+    allowed = getattr(manifest, "_plugin_allowed", None)
+    if allowed is not None and not allowed():
+        return None
     obj = _resolve_entry(manifest.entry)
     return _instantiate_capability(obj)
 

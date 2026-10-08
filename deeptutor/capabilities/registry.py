@@ -128,7 +128,7 @@ def _coerce_loop_factory(loaded: object) -> tuple[LoopExtension, LoopFactory] | 
             instance = produced()
         else:
             instance = produced
-            factory = type(produced)
+            factory = obj
     else:
         instance = obj
         factory = type(obj)
@@ -146,7 +146,7 @@ def _coerce_loop_factory(loaded: object) -> tuple[LoopExtension, LoopFactory] | 
 
 
 @cache
-def discover_external_loop_capabilities() -> tuple[tuple[str, LoopFactory], ...]:
+def _discover_external_loop_capabilities() -> tuple[tuple[str, LoopFactory], ...]:
     """Discover factory specs from canonical and one-version legacy groups."""
 
     seen = {spec.name for spec in BUILTIN_LOOP_CAPABILITY_SPECS}
@@ -175,6 +175,17 @@ def discover_external_loop_capabilities() -> tuple[tuple[str, LoopFactory], ...]
             stacklevel=2,
         )
     return tuple([*canonical, *legacy])
+
+
+def discover_external_loop_capabilities():
+    return tuple(
+        item
+        for item in _discover_external_loop_capabilities()
+        if getattr(item[1], "_plugin_allowed", lambda: True)()
+    )
+
+
+discover_external_loop_capabilities.cache_clear = _discover_external_loop_capabilities.cache_clear
 
 
 def _register_loop_entry(name: str, factory: LoopFactory) -> None:

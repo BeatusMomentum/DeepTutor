@@ -8,9 +8,11 @@ Provides lookup, listing, and OpenAI schema generation.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from typing import Any
 
+from deeptutor.core.entry_points import load_entry_point_group
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolPromptHints
 from deeptutor.tools.builtin_specs import (
     BUILTIN_TOOL_NAMES,
@@ -71,6 +73,27 @@ class ToolRegistry:
         self._tools[name] = tool
         logger.debug("Loaded built-in tool: %s", name)
         return tool
+
+    def load_plugins(self) -> None:
+        from deeptutor.plugins.registry import PluginRegistry
+        from deeptutor.plugins.runtime import load_enabled_tools
+
+        def coerce(name, loaded):
+            candidate = loaded() if inspect.isclass(loaded) else loaded
+            if callable(candidate) and not isinstance(candidate, BaseTool):
+                candidate = candidate()
+            if not isinstance(candidate, BaseTool):
+                return None
+            if candidate.name in BUILTIN_TOOL_SPEC_BY_NAME or candidate.name in self._tools:
+                return None
+            return candidate
+
+        for tool in (
+            *load_entry_point_group("deeptutor.tools", coerce, log=logger),
+            *load_enabled_tools(PluginRegistry()),
+        ):
+            if tool.name not in BUILTIN_TOOL_SPEC_BY_NAME and tool.name not in self._tools:
+                self.register(tool)
 
     def _resolve_request(
         self,
@@ -165,12 +188,23 @@ class ToolRegistry:
 
 
 _default_registry: ToolRegistry | None = None
+_default_plugin_scope = None
 
 
 def get_tool_registry() -> ToolRegistry:
     """Return the global ToolRegistry (creating & loading builtins on first call)."""
-    global _default_registry
-    if _default_registry is None:
+    global _default_registry, _default_plugin_scope
+    from deeptutor.plugins.registry import PluginRegistry
+
+    path = PluginRegistry().state_path
+    try:
+        stat = path.stat()
+        scope = (str(path.resolve()), stat.st_mtime_ns, stat.st_size)
+    except FileNotFoundError:
+        scope = (str(path.resolve()), 0, 0)
+    if _default_registry is None or _default_plugin_scope != scope:
+        _default_plugin_scope = scope
         _default_registry = ToolRegistry()
         _default_registry.load_builtins()
+        _default_registry.load_plugins()
     return _default_registry
